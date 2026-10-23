@@ -1,0 +1,4 @@
+# o cache da Godot (ela refaz sozinha)
+.godot/
+# rascunhos dos testes
+tmp/

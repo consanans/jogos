@@ -1,0 +1,303 @@
+<title>Duvido</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Rubik:wght@500;700;800&display=swap">
+<style>
+/* Layout: a ladeira de giz ocupa a coluna do meio (no celular, a tela toda menos a tira da direita, que mostra a
+   ladeira inteira e rola no editor). Em cima, o tempo e os botões; os cartões (entrada, desafio, resultado) vêm por cima.
+   Tema único escuro de propósito: é asfalto de noite riscado de giz, e o jogo foi desenhado só assim */
+:root{
+  color-scheme:dark;
+  --fora:#0B0A0E;
+  --cartao:#17161C;
+  --borda:rgba(243,238,226,.16);
+  --giz:#F3EEE2;
+  --giz2:#C2BBAB;
+  --apagado:#8F897B;
+  --amarelo:#FFC93C;
+  --amarelo-sombra:#A47808;
+  --rosa:#FF4F9A;
+  --rosa-sombra:#A3245C;
+  --azul:#4AA8FF;
+  --laranja:#FF7A2F;
+  --vermelho:#E8402A;
+  --tinta:#121116;
+  --vidro:rgba(13,12,17,.86);
+  --grao:none;
+  --col-x:0px;
+  --col-w:100%;
+  --tira-x:0px;
+  --tira-w:22px;
+  --f-tit:"Bungee","Arial Black",Impact,sans-serif;
+  --f-txt:"Rubik",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-giz:"Permanent Marker","Comic Sans MS","Chalkboard SE","Segoe Print",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;box-sizing:border-box}
+body{height:100%;margin:0;background:var(--fora);color:var(--giz);font-family:var(--f-txt);overflow:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--amarelo);outline-offset:2px}
+svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+
+#app{position:relative;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+#tira{position:absolute;top:0;left:var(--tira-x);width:var(--tira-w);height:100%;display:block;pointer-events:none;z-index:2}
+#app.editando #tira{pointer-events:auto;cursor:ns-resize}
+
+/* o placar da descida */
+.hud{position:absolute;top:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;
+  padding:10px 10px 0 max(12px,env(safe-area-inset-left,0px))}
+.relogio{font-family:var(--f-tit);font-size:34px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em;text-shadow:0 3px 0 #000,0 0 14px rgba(0,0,0,.7)}
+.relogio small{font-size:.5em;margin-left:2px}
+.alvo{font:700 13px/1.25 var(--f-txt);color:var(--giz2);margin-top:5px;text-shadow:0 1px 0 #000}
+.alvo b{color:var(--amarelo);font-weight:800}
+.bts{display:flex;gap:6px;pointer-events:auto}
+.bt-r{width:44px;height:44px;border-radius:12px;border:2px solid rgba(243,238,226,.24);background:var(--vidro);display:grid;place-items:center;padding:0}
+.bt-r[aria-pressed="false"]{opacity:.55}
+.bt-r[aria-pressed="false"] .onda{display:none}
+.bt-r[aria-pressed="true"] .mudo{display:none}
+.dica{position:absolute;left:var(--col-x);width:var(--col-w);bottom:18px;z-index:3;display:flex;justify-content:center;pointer-events:none;padding:0 14px}
+.dica span{background:var(--vidro);border:2px solid rgba(243,238,226,.22);border-radius:22px;padding:8px 14px;font:700 14px/1.3 var(--f-txt);text-align:center;text-wrap:balance}
+.dica b{color:var(--amarelo)}
+
+/* o carimbo do CAPOTOU / CHEGOU e o "toca de novo" */
+.carimbo{position:absolute;left:calc(var(--col-x) + var(--col-w) / 2);top:36%;z-index:5;pointer-events:none;text-align:center;
+  transform:translate(-50%,-50%) rotate(-7deg);max-width:calc(var(--col-w) - 32px);
+  font-family:var(--f-tit);font-size:clamp(38px,12.5vw,62px);line-height:.95;color:#fff;background:var(--vermelho);
+  padding:12px 18px 8px;border:4px solid #fff;border-radius:12px;box-shadow:0 9px 0 rgba(0,0,0,.45)}
+.carimbo small{display:block;font:800 15px/1.25 var(--f-txt);margin-top:6px;letter-spacing:0;text-wrap:balance}
+.carimbo.ok{background:var(--amarelo);color:var(--tinta);border-color:var(--tinta)}
+.carimbo.vai{background:var(--azul);color:#fff}
+.carimbo.bate{animation:bate .34s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes bate{from{transform:translate(-50%,-50%) rotate(-7deg) scale(1.9);opacity:0}to{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1}}
+.pos{position:absolute;left:var(--col-x);width:var(--col-w);bottom:16px;z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 14px;pointer-events:none}
+.pos p{margin:0;font:400 22px/1.2 var(--f-giz);text-shadow:0 2px 0 #000;text-align:center}
+.pos .linha{pointer-events:auto}
+
+/* o editor */
+.ed-topo{position:absolute;top:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;align-items:center;gap:6px;
+  padding:8px 8px 14px max(8px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(13,12,17,.94),rgba(13,12,17,.78) 70%,rgba(13,12,17,0))}
+.ed-topo .bt-r{flex:none}
+.tinta{flex:1;min-width:46px;display:flex;flex-direction:column;gap:3px}
+.tinta small{font:800 10px var(--f-txt);letter-spacing:.12em;text-transform:uppercase;color:var(--giz2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinta i{display:block;height:10px;border-radius:6px;background:rgba(243,238,226,.14);overflow:hidden}
+.tinta i span{display:block;height:100%;width:100%;border-radius:6px;background:var(--giz);transition:width .15s}
+.tinta.pouca i span{background:var(--laranja)}
+.tinta.treme{animation:treme .3s}
+@keyframes treme{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.bt-p{flex:none;height:44px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font:800 14px var(--f-txt);border:0}
+.bt-testa{background:var(--amarelo);color:var(--tinta);box-shadow:0 4px 0 var(--amarelo-sombra)}
+.bt-manda{background:var(--rosa);color:#fff;box-shadow:0 4px 0 var(--rosa-sombra)}
+.bt-manda[aria-disabled="true"]{background:rgba(243,238,226,.1);color:var(--apagado);box-shadow:none}
+.bt-manda[aria-disabled="true"] .avi{display:none}
+.bt-manda[aria-disabled="false"] .cad{display:none}
+.bt-p:active,.bt-vai:active,.bt-rosa:active{transform:translateY(3px);box-shadow:none}
+.ed-ferr{position:absolute;bottom:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;justify-content:center;gap:4px;
+  padding:16px max(6px,env(safe-area-inset-right,0px)) 10px max(6px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(13,12,17,0),rgba(13,12,17,.8) 32%,rgba(13,12,17,.95))}
+.ferr{flex:1;min-width:0;max-width:74px;height:60px;border-radius:13px;border:2px solid rgba(243,238,226,.12);background:rgba(243,238,226,.05);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:700 11px var(--f-txt);padding:0 2px;white-space:nowrap}
+.ferr svg.i{width:24px;height:24px}
+.ferr[aria-pressed="true"]{background:var(--giz);color:var(--tinta);border-color:var(--giz)}
+.ferr span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.cores{position:absolute;left:calc(var(--col-x) + 10px);bottom:86px;z-index:4;display:flex;gap:6px;padding:6px;border-radius:14px;background:var(--vidro);border:2px solid rgba(243,238,226,.16)}
+.cor{width:34px;height:34px;border-radius:10px;border:2px solid transparent;background:rgba(0,0,0,.3);display:grid;place-items:center;padding:0}
+.cor i{display:block;width:8px;height:24px;border-radius:3px;background:var(--c);transform:rotate(28deg);box-shadow:inset -2px 0 0 rgba(0,0,0,.18)}
+.cor[aria-pressed="true"]{border-color:var(--giz)}
+.ed-dica{position:absolute;bottom:136px;left:var(--col-x);width:var(--col-w);z-index:3;text-align:center;font:400 19px/1.25 var(--f-giz);color:var(--giz);
+  text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 10px rgba(0,0,0,.8);pointer-events:none;padding:0 18px;text-wrap:balance}
+.apaga-tudo{position:absolute;top:66px;right:calc(100% - var(--col-x) - var(--col-w) + 8px);z-index:5;display:flex;align-items:center;gap:6px;padding:8px;border-radius:14px;background:var(--vidro);border:2px solid rgba(243,238,226,.2);font:700 14px var(--f-txt)}
+.apaga-tudo .bt{min-height:38px;padding:6px 12px;font-size:14px}
+
+/* os cartões */
+.veu{position:absolute;inset:0;z-index:7;background:radial-gradient(ellipse at 50% 40%,rgba(11,10,14,.55),rgba(11,10,14,.86))}
+.cartao{position:absolute;inset:0;margin:auto;z-index:8;width:min(460px,calc(100% - 24px));height:fit-content;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
+  background-color:var(--cartao);background-image:var(--grao);border:2px solid var(--borda);border-radius:20px;padding:20px 18px 18px;box-shadow:0 22px 70px rgba(0,0,0,.65);
+  display:flex;flex-direction:column;gap:12px;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+.cartao h1,.cartao h2,.cartao p{margin:0}
+.logo{position:relative;text-align:center;padding:6px 0 4px}
+.logo b{display:inline-block;font-family:var(--f-tit);font-weight:400;font-size:clamp(54px,17vw,80px);line-height:.88;color:var(--amarelo);letter-spacing:.02em;transform:rotate(-3deg);
+  text-shadow:0 5px 0 var(--amarelo-sombra),0 10px 22px rgba(0,0,0,.55)}
+.logo svg{display:block;width:min(270px,70%);height:18px;margin:4px auto 0;overflow:visible}
+.olho{font:800 11.5px var(--f-txt);letter-spacing:.16em;text-transform:uppercase;color:var(--giz2);text-align:center}
+.giz{font:400 21px/1.2 var(--f-giz);text-align:center;color:var(--giz);text-wrap:balance}
+.giz em{font-style:normal;color:var(--rosa)}
+.cartao p{line-height:1.45;text-wrap:pretty}
+.cartao h2{font-family:var(--f-tit);font-weight:400;font-size:26px;line-height:1.05;text-align:center;text-wrap:balance}
+.cartao h2 em{font-style:normal;color:var(--amarelo)}
+.bt{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:14px;padding:10px 16px;font:800 16px/1.15 var(--f-txt);
+  border:2px solid rgba(243,238,226,.26);background:rgba(243,238,226,.05);color:var(--giz);text-align:center}
+.bt-vai{background:var(--amarelo);color:var(--tinta);border:0;font-family:var(--f-tit);font-weight:400;font-size:20px;letter-spacing:.01em;box-shadow:0 5px 0 var(--amarelo-sombra);padding-top:12px}
+.bt-rosa{background:var(--rosa);color:#fff;border:0;font-family:var(--f-tit);font-weight:400;font-size:18px;box-shadow:0 5px 0 var(--rosa-sombra);padding-top:12px}
+.linha{display:flex;gap:10px;flex-wrap:wrap}
+.linha .bt{flex:1 1 130px}
+.quem{display:flex;justify-content:center;align-items:center;gap:8px;font:600 14px var(--f-txt);color:var(--giz2);flex-wrap:wrap}
+.quem b{color:var(--giz)}
+.link{background:none;border:0;padding:4px 2px;color:var(--amarelo);font:700 14px var(--f-txt);text-decoration:underline;text-underline-offset:3px}
+.titulo-sec{display:flex;align-items:center;gap:10px;font:800 12px var(--f-txt);letter-spacing:.16em;text-transform:uppercase;color:var(--giz2);margin-top:4px}
+.titulo-sec::after{content:"";flex:1;height:2px;background:repeating-linear-gradient(90deg,var(--amarelo) 0 14px,transparent 14px 24px);opacity:.6}
+.fases{display:grid;gap:8px}
+.fase{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;text-align:left;padding:7px 10px 7px 7px;border-radius:14px;border:2px solid rgba(243,238,226,.13);background:rgba(0,0,0,.22);min-height:66px;width:100%}
+.fase canvas{width:48px;height:60px;border-radius:8px;display:block}
+.fase b{display:block;font:800 15px/1.2 var(--f-txt)}
+.fase small{display:block;color:var(--giz2);font:500 12.5px/1.3 var(--f-txt);margin-top:2px}
+.fase em{font-style:normal;text-align:right;font:800 14px var(--f-txt);white-space:nowrap;font-variant-numeric:tabular-nums}
+.fase em span{display:block;color:var(--apagado);font-weight:600;font-size:11.5px;margin-top:2px}
+.fase.dia{border-color:rgba(255,201,60,.65);background:linear-gradient(100deg,rgba(255,201,60,.14),rgba(0,0,0,.2) 60%)}
+.fase.dia b{color:var(--amarelo)}
+.fase:hover{border-color:rgba(243,238,226,.32)}
+.pe{display:flex;justify-content:space-between;align-items:center;gap:10px;font:600 12px var(--f-txt);color:var(--apagado);flex-wrap:wrap}
+.campo{width:100%;min-height:50px;border-radius:12px;border:2px solid rgba(243,238,226,.25);background:#0F0E13;color:var(--giz);font:700 18px var(--f-txt);padding:10px 12px;-webkit-user-select:text;user-select:text}
+textarea.campo{min-height:104px;resize:vertical;font:500 14px/1.4 var(--f-txt);word-break:break-all}
+.erro{color:#FF9A86;font-weight:700;font-size:14px}
+.desafio-topo{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.desafio-topo canvas{width:86px;height:132px;border-radius:10px;display:block;border:2px solid rgba(243,238,226,.16)}
+.corrente{list-style:none;margin:0;padding:0;display:grid;gap:5px;counter-reset:c}
+.corrente li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:7px 10px;border-radius:10px;background:rgba(0,0,0,.25);font:700 15px var(--f-txt);font-variant-numeric:tabular-nums;counter-increment:c}
+.corrente li::before{content:counter(c) "º";color:var(--apagado);font-size:12px;width:22px;flex:none}
+.corrente li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.corrente li.melhor{background:rgba(255,201,60,.16);color:var(--amarelo)}
+.corrente li.eu{outline:2px dashed rgba(243,238,226,.4);outline-offset:-2px}
+.tempo-grande{font-family:var(--f-tit);font-weight:400;font-size:clamp(50px,16vw,72px);line-height:1;text-align:center;font-variant-numeric:tabular-nums;color:var(--amarelo);text-shadow:0 5px 0 var(--amarelo-sombra)}
+.tempo-grande small{font-size:.45em;margin-left:4px}
+.compara{text-align:center;font:800 17px/1.35 var(--f-txt);text-wrap:balance}
+.compara em{font-style:normal;color:var(--amarelo)}
+.compara.perdeu em{color:var(--rosa)}
+.extra{text-align:center;color:var(--giz2);font-size:14px}
+.bolha{position:relative;background:#24232B;border-radius:14px 14px 14px 4px;padding:12px 14px;font:500 15px/1.45 var(--f-txt);white-space:pre-wrap;word-break:break-word;border:1px solid rgba(243,238,226,.12);-webkit-user-select:text;user-select:text}
+.bolha .lk{color:var(--azul);word-break:break-all}
+.ok-copia{text-align:center;font:400 20px var(--f-giz);color:var(--amarelo)}
+.aviso{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:9;max-width:calc(100% - 32px);width:max-content;background:var(--giz);color:var(--tinta);
+  font:800 14px/1.3 var(--f-txt);padding:9px 14px;border-radius:12px;box-shadow:0 6px 0 rgba(0,0,0,.4);pointer-events:none;text-align:center;text-wrap:balance}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:420px){
+  .bt-p .tx{display:none}.bt-p{padding:0 11px}
+  .ferr{font-size:10px;height:56px}
+  .relogio{font-size:29px}
+}
+@media (max-width:360px){
+  .ferr svg.i{width:21px;height:21px}.ferr{gap:2px;font-size:9.5px;letter-spacing:-.02em;padding:0 1px}.ed-ferr{gap:3px}
+  .cartao{padding:16px 14px 14px}.fase{grid-template-columns:42px 1fr auto;gap:8px}.fase canvas{width:42px;height:54px}.fase em span{display:none}
+  .tinta small{font-size:9px;letter-spacing:.06em}
+}
+@media (max-height:560px){.cartao{gap:9px}.logo b{font-size:50px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <canvas id="c" role="img" aria-label="A ladeira de giz no asfalto e o carrinho de rolimã"></canvas>
+  <canvas id="tira" aria-hidden="true"></canvas>
+
+  <div id="hud" class="hud" hidden>
+    <div>
+      <div class="relogio" id="relogio" role="timer" aria-label="tempo">0,00</div>
+      <div class="alvo" id="alvo"></div>
+    </div>
+    <div class="bts">
+      <button class="bt-r" id="bReinicia" aria-label="Recomeçar (R)"><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg></button>
+      <button class="bt-r bt-som" aria-label="Som" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="onda" d="M16 9a4.2 4.2 0 0 1 0 6M18.5 6.5a7.8 7.8 0 0 1 0 11"/><path class="mudo" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+      <button class="bt-r" id="bSai" aria-label="Sair (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </div>
+  <div id="dicaJogo" class="dica" hidden><span id="dicaTx"></span></div>
+  <div id="carimbo" class="carimbo" hidden aria-live="assertive"><span id="carT">CAPOTOU!</span><small id="carS"></small></div>
+  <div id="pos" class="pos" hidden>
+    <p id="posTx">Toca pra tentar de novo</p>
+    <div class="linha"><button class="bt" id="pEditor" hidden>Voltar pro editor</button><button class="bt" id="pSai">Sair</button></div>
+  </div>
+
+  <div id="edTopo" class="ed-topo" hidden>
+    <button class="bt-r" id="eVolta" aria-label="Voltar pro começo"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="tinta" id="tinta"><small>Giz</small><i><span id="tintaBar"></span></i></div>
+    <button class="bt-r" id="eDesfaz" aria-label="Desfazer (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="bt-r" id="eLixo" aria-label="Apagar a ladeira toda"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 7V4.5h4V7M6.5 7l1 13h9l1-13"/></svg></button>
+    <button class="bt-p bt-testa" id="eTesta" aria-label="Testar (T)"><svg class="i" viewBox="0 0 24 24"><path d="M7 4.5l12 7.5-12 7.5z" fill="currentColor"/></svg><span class="tx">Testar</span></button>
+    <button class="bt-p bt-manda" id="eManda" aria-disabled="true" aria-label="Mandar o desafio"><svg class="i cad" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><svg class="i avi" viewBox="0 0 24 24"><path d="M21 3L3 10.5l7.5 3L13.5 21z"/><path d="M10.5 13.5L21 3"/></svg><span class="tx">Mandar</span></button>
+  </div>
+  <div id="apagaTudo" class="apaga-tudo" hidden><span>Apagar tudo?</span><button class="bt" id="eLixoSim">Apagar</button><button class="bt" id="eLixoNao">Não</button></div>
+  <div id="edDica" class="ed-dica" hidden aria-live="polite"></div>
+  <div id="cores" class="cores" hidden role="group" aria-label="Cor do giz"></div>
+  <div id="edFerr" class="ed-ferr" hidden role="toolbar" aria-label="Ferramentas">
+    <button class="ferr" data-f="lapis" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 19l2.5-.6L19 6.9 17.1 5 5.6 16.5z"/><path d="M15 7l2 2"/><path d="M4 21h7" stroke-dasharray="2 2.5"/></svg><span>Giz</span></button>
+    <button class="ferr" data-f="borracha" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.5 14.5l8.5-8.5 6.5 6.5-7.5 7.5H9.5z"/><path d="M9 10l6.5 6.5"/></svg><span>Apaga</span></button>
+    <button class="ferr" data-f="mola" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14"/><path d="M8 5l8 2.5-8 2.5 8 2.5-8 2.5 8 2.5"/><path d="M6 19h12"/></svg><span>Mola</span></button>
+    <button class="ferr" data-f="turbo" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 6.5l6 5.5-6 5.5M11.5 6.5l6 5.5-6 5.5"/></svg><span>Turbo</span></button>
+    <button class="ferr" data-f="cachorro" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 13.5c0-3 2-5 5-5h5l2-3.5 1.5 3.5h2.5l1.5 2.5-2 1.5h-2v5.5M6.5 13.5v5.5M10 15v4M14.5 15.5v3.5"/><path d="M3.5 13.5L2 11"/></svg><span>Cachorro</span></button>
+    <button class="ferr" data-f="chegada" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M5.5 21V4"/><path d="M5.5 4.5h13v8h-13"/><path d="M9.5 4.5v8M13.5 4.5v8M5.5 8.5h13" stroke-width="1.6"/></svg><span>Chegada</span></button>
+  </div>
+
+  <div id="veu" class="veu"></div>
+
+  <section id="inicio" class="cartao" aria-labelledby="logoT">
+    <div class="logo"><b id="logoT">DUVIDO</b>
+      <svg viewBox="0 0 270 18" aria-hidden="true"><path d="M4 12 C 60 4, 120 16, 170 8 S 250 6, 266 10" fill="none" stroke="#F3EEE2" stroke-width="5" stroke-linecap="round" opacity=".9"/><path d="M30 15 C 90 9, 150 17, 236 12" fill="none" stroke="#F3EEE2" stroke-width="2.5" stroke-linecap="round" opacity=".45"/></svg>
+    </div>
+    <p class="giz">Desenha a ladeira, desce de rolimã e manda pro amigo: <em>duvido tu descer essa.</em></p>
+    <div class="linha">
+      <button class="bt bt-vai" id="iFaz">Fazer o meu</button>
+      <button class="bt" id="iTenho">Tenho um desafio</button>
+    </div>
+    <div class="quem" id="iQuem" hidden>Tu é <b id="iNome"></b><button class="link" id="iTroca">trocar</button></div>
+    <div class="titulo-sec">Ladeiras prontas</div>
+    <div class="fases" id="iFases"></div>
+    <div class="pe"><span>Toca: pula · Segura no ar: cambalhota</span><button class="bt-r bt-som" aria-label="Som" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="onda" d="M16 9a4.2 4.2 0 0 1 0 6M18.5 6.5a7.8 7.8 0 0 1 0 11"/><path class="mudo" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
+  </section>
+
+  <section id="desafio" class="cartao" hidden aria-labelledby="dT">
+    <div class="olho">Desafio</div>
+    <div class="desafio-topo">
+      <canvas id="dMini" width="172" height="264" aria-hidden="true"></canvas>
+      <div>
+        <h2 id="dT"><em id="dQuem">Fulano</em> duvidou tu descer essa.</h2>
+      </div>
+    </div>
+    <ol class="corrente" id="dCorrente" aria-label="A corrente de quem desceu"></ol>
+    <p class="extra" id="dEu" hidden></p>
+    <button class="bt bt-vai" id="dDesce">Descer</button>
+    <button class="bt" id="dVolta">Voltar pro começo</button>
+  </section>
+
+  <section id="cola" class="cartao" hidden aria-labelledby="cT">
+    <div class="olho">Tenho um desafio</div>
+    <h2 id="cT">Cola o link aqui</h2>
+    <p>Pode ser a mensagem inteira que o amigo mandou, o link ou só o código.</p>
+    <textarea class="campo" id="cTexto" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Cola aqui"></textarea>
+    <p class="erro" id="cErro" hidden role="alert"></p>
+    <div class="linha"><button class="bt" id="cVolta">Voltar</button><button class="bt bt-vai" id="cAbre">Abrir</button></div>
+  </section>
+
+  <section id="nome" class="cartao" hidden aria-labelledby="nT">
+    <div class="olho" id="nOlho">Antes de mandar</div>
+    <h2 id="nT">Como tu chama?</h2>
+    <p id="nTx">Teu nome vai junto no desafio, do lado do teu tempo.</p>
+    <input class="campo" id="nCampo" maxlength="14" autocomplete="nickname" spellcheck="false" placeholder="Teu nome ou apelido">
+    <p class="erro" id="nErro" hidden role="alert"></p>
+    <div class="linha"><button class="bt" id="nVolta">Voltar</button><button class="bt bt-vai" id="nOk">Pronto</button></div>
+  </section>
+
+  <section id="fim" class="cartao" hidden aria-live="polite" aria-labelledby="fT">
+    <div class="olho" id="fOlho">Pra aquecer</div>
+    <h2 id="fT" class="so-leitor">Chegou</h2>
+    <div class="tempo-grande" id="fTempo">0,00<small>s</small></div>
+    <p class="extra" id="fBonus" hidden></p>
+    <p class="compara" id="fCompara"></p>
+    <p class="extra" id="fRec"></p>
+    <div class="linha">
+      <button class="bt bt-vai" id="fDeNovo">De novo</button>
+      <button class="bt bt-rosa" id="fManda" hidden>Mandar o desafio</button>
+    </div>
+    <div class="linha"><button class="bt" id="fEditor" hidden>Voltar pro editor</button><button class="bt" id="fMenu">Outra ladeira</button></div>
+  </section>
+
+  <section id="manda" class="cartao" hidden aria-labelledby="mT">
+    <div class="olho">Manda pro amigo</div>
+    <h2 id="mT">Duvido!</h2>
+    <div class="bolha" id="mBolha"></div>
+    <textarea class="campo" id="mTexto" hidden readonly aria-label="A mensagem pra copiar"></textarea>
+    <p class="ok-copia" id="mOk" hidden aria-live="polite"></p>
+    <div class="linha"><button class="bt bt-rosa" id="mCopia">Copiar a mensagem</button><button class="bt" id="mShare" hidden>Compartilhar</button></div>
+    <button class="bt" id="mVolta">Voltar</button>
+  </section>
+
+  <div id="aviso" class="aviso" hidden role="status"></div>
+</div>

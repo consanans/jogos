@@ -1,0 +1,2199 @@
+<title>Duvido</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Permanent+Marker&family=Rubik:wght@500;700;800&display=swap">
+<style>
+/* Layout: a ladeira de giz ocupa a coluna do meio (no celular, a tela toda menos a tira da direita, que mostra a
+   ladeira inteira e rola no editor). Em cima, o tempo e os botões; os cartões (entrada, desafio, resultado) vêm por cima.
+   Tema único escuro de propósito: é asfalto de noite riscado de giz, e o jogo foi desenhado só assim */
+:root{
+  color-scheme:dark;
+  --fora:#0B0A0E;
+  --cartao:#17161C;
+  --borda:rgba(243,238,226,.16);
+  --giz:#F3EEE2;
+  --giz2:#C2BBAB;
+  --apagado:#8F897B;
+  --amarelo:#FFC93C;
+  --amarelo-sombra:#A47808;
+  --rosa:#FF4F9A;
+  --rosa-sombra:#A3245C;
+  --azul:#4AA8FF;
+  --laranja:#FF7A2F;
+  --vermelho:#E8402A;
+  --tinta:#121116;
+  --vidro:rgba(13,12,17,.86);
+  --grao:none;
+  --col-x:0px;
+  --col-w:100%;
+  --tira-x:0px;
+  --tira-w:22px;
+  --f-tit:"Bungee","Arial Black",Impact,sans-serif;
+  --f-txt:"Rubik",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-giz:"Permanent Marker","Comic Sans MS","Chalkboard SE","Segoe Print",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;box-sizing:border-box}
+body{height:100%;margin:0;background:var(--fora);color:var(--giz);font-family:var(--f-txt);overflow:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--amarelo);outline-offset:2px}
+svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+
+#app{position:relative;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+#tira{position:absolute;top:0;left:var(--tira-x);width:var(--tira-w);height:100%;display:block;pointer-events:none;z-index:2}
+#app.editando #tira{pointer-events:auto;cursor:ns-resize}
+
+/* o placar da descida */
+.hud{position:absolute;top:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;
+  padding:10px 10px 0 max(12px,env(safe-area-inset-left,0px))}
+.relogio{font-family:var(--f-tit);font-size:34px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em;text-shadow:0 3px 0 #000,0 0 14px rgba(0,0,0,.7)}
+.relogio small{font-size:.5em;margin-left:2px}
+.alvo{font:700 13px/1.25 var(--f-txt);color:var(--giz2);margin-top:5px;text-shadow:0 1px 0 #000}
+.alvo b{color:var(--amarelo);font-weight:800}
+.bts{display:flex;gap:6px;pointer-events:auto}
+.bt-r{width:44px;height:44px;border-radius:12px;border:2px solid rgba(243,238,226,.24);background:var(--vidro);display:grid;place-items:center;padding:0}
+.bt-r[aria-pressed="false"]{opacity:.55}
+.bt-r[aria-pressed="false"] .onda{display:none}
+.bt-r[aria-pressed="true"] .mudo{display:none}
+.dica{position:absolute;left:var(--col-x);width:var(--col-w);bottom:18px;z-index:3;display:flex;justify-content:center;pointer-events:none;padding:0 14px}
+.dica span{background:var(--vidro);border:2px solid rgba(243,238,226,.22);border-radius:22px;padding:8px 14px;font:700 14px/1.3 var(--f-txt);text-align:center;text-wrap:balance}
+.dica b{color:var(--amarelo)}
+
+/* o carimbo do CAPOTOU / CHEGOU e o "toca de novo" */
+.carimbo{position:absolute;left:calc(var(--col-x) + var(--col-w) / 2);top:36%;z-index:5;pointer-events:none;text-align:center;
+  transform:translate(-50%,-50%) rotate(-7deg);max-width:calc(var(--col-w) - 32px);
+  font-family:var(--f-tit);font-size:clamp(38px,12.5vw,62px);line-height:.95;color:#fff;background:var(--vermelho);
+  padding:12px 18px 8px;border:4px solid #fff;border-radius:12px;box-shadow:0 9px 0 rgba(0,0,0,.45)}
+.carimbo small{display:block;font:800 15px/1.25 var(--f-txt);margin-top:6px;letter-spacing:0;text-wrap:balance}
+.carimbo.ok{background:var(--amarelo);color:var(--tinta);border-color:var(--tinta)}
+.carimbo.vai{background:var(--azul);color:#fff}
+.carimbo.bate{animation:bate .34s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes bate{from{transform:translate(-50%,-50%) rotate(-7deg) scale(1.9);opacity:0}to{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1}}
+.pos{position:absolute;left:var(--col-x);width:var(--col-w);bottom:16px;z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 14px;pointer-events:none}
+.pos p{margin:0;font:400 22px/1.2 var(--f-giz);text-shadow:0 2px 0 #000;text-align:center}
+.pos .linha{pointer-events:auto}
+
+/* o editor */
+.ed-topo{position:absolute;top:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;align-items:center;gap:6px;
+  padding:8px 8px 14px max(8px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(13,12,17,.94),rgba(13,12,17,.78) 70%,rgba(13,12,17,0))}
+.ed-topo .bt-r{flex:none}
+.tinta{flex:1;min-width:46px;display:flex;flex-direction:column;gap:3px}
+.tinta small{font:800 10px var(--f-txt);letter-spacing:.12em;text-transform:uppercase;color:var(--giz2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinta i{display:block;height:10px;border-radius:6px;background:rgba(243,238,226,.14);overflow:hidden}
+.tinta i span{display:block;height:100%;width:100%;border-radius:6px;background:var(--giz);transition:width .15s}
+.tinta.pouca i span{background:var(--laranja)}
+.tinta.treme{animation:treme .3s}
+@keyframes treme{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.bt-p{flex:none;height:44px;border-radius:12px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font:800 14px var(--f-txt);border:0}
+.bt-testa{background:var(--amarelo);color:var(--tinta);box-shadow:0 4px 0 var(--amarelo-sombra)}
+.bt-manda{background:var(--rosa);color:#fff;box-shadow:0 4px 0 var(--rosa-sombra)}
+.bt-manda[aria-disabled="true"]{background:rgba(243,238,226,.1);color:var(--apagado);box-shadow:none}
+.bt-manda[aria-disabled="true"] .avi{display:none}
+.bt-manda[aria-disabled="false"] .cad{display:none}
+.bt-p:active,.bt-vai:active,.bt-rosa:active{transform:translateY(3px);box-shadow:none}
+.ed-ferr{position:absolute;bottom:0;left:var(--col-x);width:var(--col-w);z-index:4;display:flex;justify-content:center;gap:4px;
+  padding:16px max(6px,env(safe-area-inset-right,0px)) 10px max(6px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(13,12,17,0),rgba(13,12,17,.8) 32%,rgba(13,12,17,.95))}
+.ferr{flex:1;min-width:0;max-width:74px;height:60px;border-radius:13px;border:2px solid rgba(243,238,226,.12);background:rgba(243,238,226,.05);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:700 11px var(--f-txt);padding:0 2px;white-space:nowrap}
+.ferr svg.i{width:24px;height:24px}
+.ferr[aria-pressed="true"]{background:var(--giz);color:var(--tinta);border-color:var(--giz)}
+.ferr span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.cores{position:absolute;left:calc(var(--col-x) + 10px);bottom:86px;z-index:4;display:flex;gap:6px;padding:6px;border-radius:14px;background:var(--vidro);border:2px solid rgba(243,238,226,.16)}
+.cor{width:34px;height:34px;border-radius:10px;border:2px solid transparent;background:rgba(0,0,0,.3);display:grid;place-items:center;padding:0}
+.cor i{display:block;width:8px;height:24px;border-radius:3px;background:var(--c);transform:rotate(28deg);box-shadow:inset -2px 0 0 rgba(0,0,0,.18)}
+.cor[aria-pressed="true"]{border-color:var(--giz)}
+.ed-dica{position:absolute;bottom:136px;left:var(--col-x);width:var(--col-w);z-index:3;text-align:center;font:400 19px/1.25 var(--f-giz);color:var(--giz);
+  text-shadow:0 2px 0 rgba(0,0,0,.8),0 0 10px rgba(0,0,0,.8);pointer-events:none;padding:0 18px;text-wrap:balance}
+.apaga-tudo{position:absolute;top:66px;right:calc(100% - var(--col-x) - var(--col-w) + 8px);z-index:5;display:flex;align-items:center;gap:6px;padding:8px;border-radius:14px;background:var(--vidro);border:2px solid rgba(243,238,226,.2);font:700 14px var(--f-txt)}
+.apaga-tudo .bt{min-height:38px;padding:6px 12px;font-size:14px}
+
+/* os cartões */
+.veu{position:absolute;inset:0;z-index:7;background:radial-gradient(ellipse at 50% 40%,rgba(11,10,14,.55),rgba(11,10,14,.86))}
+.cartao{position:absolute;inset:0;margin:auto;z-index:8;width:min(460px,calc(100% - 24px));height:fit-content;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
+  background-color:var(--cartao);background-image:var(--grao);border:2px solid var(--borda);border-radius:20px;padding:20px 18px 18px;box-shadow:0 22px 70px rgba(0,0,0,.65);
+  display:flex;flex-direction:column;gap:12px;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+.cartao h1,.cartao h2,.cartao p{margin:0}
+.logo{position:relative;text-align:center;padding:6px 0 4px}
+.logo b{display:inline-block;font-family:var(--f-tit);font-weight:400;font-size:clamp(54px,17vw,80px);line-height:.88;color:var(--amarelo);letter-spacing:.02em;transform:rotate(-3deg);
+  text-shadow:0 5px 0 var(--amarelo-sombra),0 10px 22px rgba(0,0,0,.55)}
+.logo svg{display:block;width:min(270px,70%);height:18px;margin:4px auto 0;overflow:visible}
+.olho{font:800 11.5px var(--f-txt);letter-spacing:.16em;text-transform:uppercase;color:var(--giz2);text-align:center}
+.giz{font:400 21px/1.2 var(--f-giz);text-align:center;color:var(--giz);text-wrap:balance}
+.giz em{font-style:normal;color:var(--rosa)}
+.cartao p{line-height:1.45;text-wrap:pretty}
+.cartao h2{font-family:var(--f-tit);font-weight:400;font-size:26px;line-height:1.05;text-align:center;text-wrap:balance}
+.cartao h2 em{font-style:normal;color:var(--amarelo)}
+.bt{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:14px;padding:10px 16px;font:800 16px/1.15 var(--f-txt);
+  border:2px solid rgba(243,238,226,.26);background:rgba(243,238,226,.05);color:var(--giz);text-align:center}
+.bt-vai{background:var(--amarelo);color:var(--tinta);border:0;font-family:var(--f-tit);font-weight:400;font-size:20px;letter-spacing:.01em;box-shadow:0 5px 0 var(--amarelo-sombra);padding-top:12px}
+.bt-rosa{background:var(--rosa);color:#fff;border:0;font-family:var(--f-tit);font-weight:400;font-size:18px;box-shadow:0 5px 0 var(--rosa-sombra);padding-top:12px}
+.linha{display:flex;gap:10px;flex-wrap:wrap}
+.linha .bt{flex:1 1 130px}
+.quem{display:flex;justify-content:center;align-items:center;gap:8px;font:600 14px var(--f-txt);color:var(--giz2);flex-wrap:wrap}
+.quem b{color:var(--giz)}
+.link{background:none;border:0;padding:4px 2px;color:var(--amarelo);font:700 14px var(--f-txt);text-decoration:underline;text-underline-offset:3px}
+.titulo-sec{display:flex;align-items:center;gap:10px;font:800 12px var(--f-txt);letter-spacing:.16em;text-transform:uppercase;color:var(--giz2);margin-top:4px}
+.titulo-sec::after{content:"";flex:1;height:2px;background:repeating-linear-gradient(90deg,var(--amarelo) 0 14px,transparent 14px 24px);opacity:.6}
+.fases{display:grid;gap:8px}
+.fase{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;text-align:left;padding:7px 10px 7px 7px;border-radius:14px;border:2px solid rgba(243,238,226,.13);background:rgba(0,0,0,.22);min-height:66px;width:100%}
+.fase canvas{width:48px;height:60px;border-radius:8px;display:block}
+.fase b{display:block;font:800 15px/1.2 var(--f-txt)}
+.fase small{display:block;color:var(--giz2);font:500 12.5px/1.3 var(--f-txt);margin-top:2px}
+.fase em{font-style:normal;text-align:right;font:800 14px var(--f-txt);white-space:nowrap;font-variant-numeric:tabular-nums}
+.fase em span{display:block;color:var(--apagado);font-weight:600;font-size:11.5px;margin-top:2px}
+.fase.dia{border-color:rgba(255,201,60,.65);background:linear-gradient(100deg,rgba(255,201,60,.14),rgba(0,0,0,.2) 60%)}
+.fase.dia b{color:var(--amarelo)}
+.fase:hover{border-color:rgba(243,238,226,.32)}
+.pe{display:flex;justify-content:space-between;align-items:center;gap:10px;font:600 12px var(--f-txt);color:var(--apagado);flex-wrap:wrap}
+.campo{width:100%;min-height:50px;border-radius:12px;border:2px solid rgba(243,238,226,.25);background:#0F0E13;color:var(--giz);font:700 18px var(--f-txt);padding:10px 12px;-webkit-user-select:text;user-select:text}
+textarea.campo{min-height:104px;resize:vertical;font:500 14px/1.4 var(--f-txt);word-break:break-all}
+.erro{color:#FF9A86;font-weight:700;font-size:14px}
+.desafio-topo{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.desafio-topo canvas{width:86px;height:132px;border-radius:10px;display:block;border:2px solid rgba(243,238,226,.16)}
+.corrente{list-style:none;margin:0;padding:0;display:grid;gap:5px;counter-reset:c}
+.corrente li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:7px 10px;border-radius:10px;background:rgba(0,0,0,.25);font:700 15px var(--f-txt);font-variant-numeric:tabular-nums;counter-increment:c}
+.corrente li::before{content:counter(c) "º";color:var(--apagado);font-size:12px;width:22px;flex:none}
+.corrente li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.corrente li.melhor{background:rgba(255,201,60,.16);color:var(--amarelo)}
+.corrente li.eu{outline:2px dashed rgba(243,238,226,.4);outline-offset:-2px}
+.tempo-grande{font-family:var(--f-tit);font-weight:400;font-size:clamp(50px,16vw,72px);line-height:1;text-align:center;font-variant-numeric:tabular-nums;color:var(--amarelo);text-shadow:0 5px 0 var(--amarelo-sombra)}
+.tempo-grande small{font-size:.45em;margin-left:4px}
+.compara{text-align:center;font:800 17px/1.35 var(--f-txt);text-wrap:balance}
+.compara em{font-style:normal;color:var(--amarelo)}
+.compara.perdeu em{color:var(--rosa)}
+.extra{text-align:center;color:var(--giz2);font-size:14px}
+.bolha{position:relative;background:#24232B;border-radius:14px 14px 14px 4px;padding:12px 14px;font:500 15px/1.45 var(--f-txt);white-space:pre-wrap;word-break:break-word;border:1px solid rgba(243,238,226,.12);-webkit-user-select:text;user-select:text}
+.bolha .lk{color:var(--azul);word-break:break-all}
+.ok-copia{text-align:center;font:400 20px var(--f-giz);color:var(--amarelo)}
+.aviso{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:9;max-width:calc(100% - 32px);width:max-content;background:var(--giz);color:var(--tinta);
+  font:800 14px/1.3 var(--f-txt);padding:9px 14px;border-radius:12px;box-shadow:0 6px 0 rgba(0,0,0,.4);pointer-events:none;text-align:center;text-wrap:balance}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:420px){
+  .bt-p .tx{display:none}.bt-p{padding:0 11px}
+  .ferr{font-size:10px;height:56px}
+  .relogio{font-size:29px}
+}
+@media (max-width:360px){
+  .ferr svg.i{width:21px;height:21px}.ferr{gap:2px;font-size:9.5px;letter-spacing:-.02em;padding:0 1px}.ed-ferr{gap:3px}
+  .cartao{padding:16px 14px 14px}.fase{grid-template-columns:42px 1fr auto;gap:8px}.fase canvas{width:42px;height:54px}.fase em span{display:none}
+  .tinta small{font-size:9px;letter-spacing:.06em}
+}
+@media (max-height:560px){.cartao{gap:9px}.logo b{font-size:50px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <canvas id="c" role="img" aria-label="A ladeira de giz no asfalto e o carrinho de rolimã"></canvas>
+  <canvas id="tira" aria-hidden="true"></canvas>
+
+  <div id="hud" class="hud" hidden>
+    <div>
+      <div class="relogio" id="relogio" role="timer" aria-label="tempo">0,00</div>
+      <div class="alvo" id="alvo"></div>
+    </div>
+    <div class="bts">
+      <button class="bt-r" id="bReinicia" aria-label="Recomeçar (R)"><svg class="i" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg></button>
+      <button class="bt-r bt-som" aria-label="Som" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="onda" d="M16 9a4.2 4.2 0 0 1 0 6M18.5 6.5a7.8 7.8 0 0 1 0 11"/><path class="mudo" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+      <button class="bt-r" id="bSai" aria-label="Sair (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </div>
+  <div id="dicaJogo" class="dica" hidden><span id="dicaTx"></span></div>
+  <div id="carimbo" class="carimbo" hidden aria-live="assertive"><span id="carT">CAPOTOU!</span><small id="carS"></small></div>
+  <div id="pos" class="pos" hidden>
+    <p id="posTx">Toca pra tentar de novo</p>
+    <div class="linha"><button class="bt" id="pEditor" hidden>Voltar pro editor</button><button class="bt" id="pSai">Sair</button></div>
+  </div>
+
+  <div id="edTopo" class="ed-topo" hidden>
+    <button class="bt-r" id="eVolta" aria-label="Voltar pro começo"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="tinta" id="tinta"><small>Giz</small><i><span id="tintaBar"></span></i></div>
+    <button class="bt-r" id="eDesfaz" aria-label="Desfazer (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="bt-r" id="eLixo" aria-label="Apagar a ladeira toda"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 7V4.5h4V7M6.5 7l1 13h9l1-13"/></svg></button>
+    <button class="bt-p bt-testa" id="eTesta" aria-label="Testar (T)"><svg class="i" viewBox="0 0 24 24"><path d="M7 4.5l12 7.5-12 7.5z" fill="currentColor"/></svg><span class="tx">Testar</span></button>
+    <button class="bt-p bt-manda" id="eManda" aria-disabled="true" aria-label="Mandar o desafio"><svg class="i cad" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><svg class="i avi" viewBox="0 0 24 24"><path d="M21 3L3 10.5l7.5 3L13.5 21z"/><path d="M10.5 13.5L21 3"/></svg><span class="tx">Mandar</span></button>
+  </div>
+  <div id="apagaTudo" class="apaga-tudo" hidden><span>Apagar tudo?</span><button class="bt" id="eLixoSim">Apagar</button><button class="bt" id="eLixoNao">Não</button></div>
+  <div id="edDica" class="ed-dica" hidden aria-live="polite"></div>
+  <div id="cores" class="cores" hidden role="group" aria-label="Cor do giz"></div>
+  <div id="edFerr" class="ed-ferr" hidden role="toolbar" aria-label="Ferramentas">
+    <button class="ferr" data-f="lapis" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 19l2.5-.6L19 6.9 17.1 5 5.6 16.5z"/><path d="M15 7l2 2"/><path d="M4 21h7" stroke-dasharray="2 2.5"/></svg><span>Giz</span></button>
+    <button class="ferr" data-f="borracha" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M9 20h11"/><path d="M4.5 14.5l8.5-8.5 6.5 6.5-7.5 7.5H9.5z"/><path d="M9 10l6.5 6.5"/></svg><span>Apaga</span></button>
+    <button class="ferr" data-f="mola" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M5 5h14"/><path d="M8 5l8 2.5-8 2.5 8 2.5-8 2.5 8 2.5"/><path d="M6 19h12"/></svg><span>Mola</span></button>
+    <button class="ferr" data-f="turbo" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M4 6.5l6 5.5-6 5.5M11.5 6.5l6 5.5-6 5.5"/></svg><span>Turbo</span></button>
+    <button class="ferr" data-f="cachorro" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 13.5c0-3 2-5 5-5h5l2-3.5 1.5 3.5h2.5l1.5 2.5-2 1.5h-2v5.5M6.5 13.5v5.5M10 15v4M14.5 15.5v3.5"/><path d="M3.5 13.5L2 11"/></svg><span>Cachorro</span></button>
+    <button class="ferr" data-f="chegada" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M5.5 21V4"/><path d="M5.5 4.5h13v8h-13"/><path d="M9.5 4.5v8M13.5 4.5v8M5.5 8.5h13" stroke-width="1.6"/></svg><span>Chegada</span></button>
+  </div>
+
+  <div id="veu" class="veu"></div>
+
+  <section id="inicio" class="cartao" aria-labelledby="logoT">
+    <div class="logo"><b id="logoT">DUVIDO</b>
+      <svg viewBox="0 0 270 18" aria-hidden="true"><path d="M4 12 C 60 4, 120 16, 170 8 S 250 6, 266 10" fill="none" stroke="#F3EEE2" stroke-width="5" stroke-linecap="round" opacity=".9"/><path d="M30 15 C 90 9, 150 17, 236 12" fill="none" stroke="#F3EEE2" stroke-width="2.5" stroke-linecap="round" opacity=".45"/></svg>
+    </div>
+    <p class="giz">Desenha a ladeira, desce de rolimã e manda pro amigo: <em>duvido tu descer essa.</em></p>
+    <div class="linha">
+      <button class="bt bt-vai" id="iFaz">Fazer o meu</button>
+      <button class="bt" id="iTenho">Tenho um desafio</button>
+    </div>
+    <div class="quem" id="iQuem" hidden>Tu é <b id="iNome"></b><button class="link" id="iTroca">trocar</button></div>
+    <div class="titulo-sec">Ladeiras prontas</div>
+    <div class="fases" id="iFases"></div>
+    <div class="pe"><span>Toca: pula · Segura no ar: cambalhota</span><button class="bt-r bt-som" aria-label="Som" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path class="onda" d="M16 9a4.2 4.2 0 0 1 0 6M18.5 6.5a7.8 7.8 0 0 1 0 11"/><path class="mudo" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div>
+  </section>
+
+  <section id="desafio" class="cartao" hidden aria-labelledby="dT">
+    <div class="olho">Desafio</div>
+    <div class="desafio-topo">
+      <canvas id="dMini" width="172" height="264" aria-hidden="true"></canvas>
+      <div>
+        <h2 id="dT"><em id="dQuem">Fulano</em> duvidou tu descer essa.</h2>
+      </div>
+    </div>
+    <ol class="corrente" id="dCorrente" aria-label="A corrente de quem desceu"></ol>
+    <p class="extra" id="dEu" hidden></p>
+    <button class="bt bt-vai" id="dDesce">Descer</button>
+    <button class="bt" id="dVolta">Voltar pro começo</button>
+  </section>
+
+  <section id="cola" class="cartao" hidden aria-labelledby="cT">
+    <div class="olho">Tenho um desafio</div>
+    <h2 id="cT">Cola o link aqui</h2>
+    <p>Pode ser a mensagem inteira que o amigo mandou, o link ou só o código.</p>
+    <textarea class="campo" id="cTexto" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Cola aqui"></textarea>
+    <p class="erro" id="cErro" hidden role="alert"></p>
+    <div class="linha"><button class="bt" id="cVolta">Voltar</button><button class="bt bt-vai" id="cAbre">Abrir</button></div>
+  </section>
+
+  <section id="nome" class="cartao" hidden aria-labelledby="nT">
+    <div class="olho" id="nOlho">Antes de mandar</div>
+    <h2 id="nT">Como tu chama?</h2>
+    <p id="nTx">Teu nome vai junto no desafio, do lado do teu tempo.</p>
+    <input class="campo" id="nCampo" maxlength="14" autocomplete="nickname" spellcheck="false" placeholder="Teu nome ou apelido">
+    <p class="erro" id="nErro" hidden role="alert"></p>
+    <div class="linha"><button class="bt" id="nVolta">Voltar</button><button class="bt bt-vai" id="nOk">Pronto</button></div>
+  </section>
+
+  <section id="fim" class="cartao" hidden aria-live="polite" aria-labelledby="fT">
+    <div class="olho" id="fOlho">Pra aquecer</div>
+    <h2 id="fT" class="so-leitor">Chegou</h2>
+    <div class="tempo-grande" id="fTempo">0,00<small>s</small></div>
+    <p class="extra" id="fBonus" hidden></p>
+    <p class="compara" id="fCompara"></p>
+    <p class="extra" id="fRec"></p>
+    <div class="linha">
+      <button class="bt bt-vai" id="fDeNovo">De novo</button>
+      <button class="bt bt-rosa" id="fManda" hidden>Mandar o desafio</button>
+    </div>
+    <div class="linha"><button class="bt" id="fEditor" hidden>Voltar pro editor</button><button class="bt" id="fMenu">Outra ladeira</button></div>
+  </section>
+
+  <section id="manda" class="cartao" hidden aria-labelledby="mT">
+    <div class="olho">Manda pro amigo</div>
+    <h2 id="mT">Duvido!</h2>
+    <div class="bolha" id="mBolha"></div>
+    <textarea class="campo" id="mTexto" hidden readonly aria-label="A mensagem pra copiar"></textarea>
+    <p class="ok-copia" id="mOk" hidden aria-live="polite"></p>
+    <div class="linha"><button class="bt bt-rosa" id="mCopia">Copiar a mensagem</button><button class="bt" id="mShare" hidden>Compartilhar</button></div>
+    <button class="bt" id="mVolta">Voltar</button>
+  </section>
+
+  <div id="aviso" class="aviso" hidden role="status"></div>
+</div>
+
+<script>
+'use strict';
+// o link deste jogo depois de publicado: quem abre o desafio dentro do Claude cai direto nele (vazio: a mensagem leva só o código)
+const LINK_DO_ARTEFATO = '';
+/* ======================= o núcleo: física, fases e o código do link ======================= */
+// Tudo daqui até o "fim do núcleo" é puro e determinístico. Na física só entra + − × ÷ e raiz quadrada
+// (nada de seno nem cosseno do navegador, que muda no último dígito de um aparelho pro outro): a mesma
+// fase com os mesmos toques dá o mesmo resultado em qualquer celular, e o fantasma do amigo desce igualzinho.
+
+const PASSO = 1 / 120;          // a física anda em passos fixos
+const G = 980;                  // gravidade forte, de ladeira
+const LARG = 420;               // largura do mundo
+const ALT_MAX = 5200;           // até onde dá pra desenhar (umas 6 telas)
+const LB = 30;                  // distância entre os rolimãs
+const RR = 10;                  // raio do rolimã que bate no giz (o rolimã de 6,5 mais a metade do traço)
+const RH = 8.5;                 // a cabeça com o balde
+const HC = 26;                  // altura da cabeça acima da tábua
+const V0 = 90;                  // o empurrão da largada
+const PULO = 350;
+const VMAX = 780;
+const ARRASTO = 0.00032;        // o vento na cara (cresce com a velocidade)
+const ROLA = 16;                // rolimã quase não freia
+const QUIQUE = 0.16, QUIQUE_MIN = 110;
+const W_GIRO = 8.5, A_GIRO = 55, A_SOLTA = 60, SEG_MIN = 16;   // cambalhota: só segurando mais de 0,13 s
+const AR_MIN = 22, PE_MIN = 0.14, COYOTE = 7;                 // pouso de pé: até uns 82 graus
+const MOLA_L = 18, MOLA_V = 560;
+const TURBO_V = 720, TURBO_R = 26;
+const CAO_R = 11, CAO_VAI = 32, CAO_PER = 384;                 // o caramelo vai e volta em 3,2 s
+const CHEG_L = 22, CHEG_A = 100;
+const T_MAX = 14400, PARADO_MAX = 360;                         // 2 minutos; 3 s parado é empacou
+const LARGADA = [4, 78, 4, 100, 128, 150];                     // o batente e a tábua da largada
+// as 16 direções do turbo, de 22,5 em 22,5 graus (0 = direita, 4 = pra baixo), escritas à mão
+const DIRS = [[1, 0], [0.9238795, 0.3826834], [0.7071068, 0.7071068], [0.3826834, 0.9238795], [0, 1], [-0.3826834, 0.9238795], [-0.7071068, 0.7071068], [-0.9238795, 0.3826834],
+  [-1, 0], [-0.9238795, -0.3826834], [-0.7071068, -0.7071068], [-0.3826834, -0.9238795], [0, -1], [0.3826834, -0.9238795], [0.7071068, -0.7071068], [0.9238795, -0.3826834]];
+const TIPOS = ['mola', 'turbo', 'cachorro', 'chegada'];
+
+/* ---------- a fase compilada: os segmentos numa grade, os carimbos prontos ---------- */
+const CEL = 40, GX0 = -2, GCOLS = 16;
+function compila(fase){
+  const S = [], T = [];
+  const seg = (x1, y1, x2, y2, t) => { if(x1 === x2 && y1 === y2) return; S.push(x1, y1, x2, y2); T.push(t); };
+  for(let i = 2; i < LARGADA.length; i += 2) seg(LARGADA[i - 2], LARGADA[i - 1], LARGADA[i], LARGADA[i + 1], -1);
+  let yMax = 150;
+  for(const tr of fase.tracos){
+    const p = tr.pts;
+    for(let i = 2; i < p.length; i += 2) seg(p[i - 2], p[i - 1], p[i], p[i + 1], -1);
+    for(let i = 1; i < p.length; i += 2) if(p[i] > yMax) yMax = p[i];
+  }
+  const molas = [], turbos = [], caes = []; let chegada = null;
+  for(const c of fase.carimbos){
+    if(c.y > yMax) yMax = c.y;
+    if(c.tipo === 'mola'){ molas.push({ x: c.x, y: c.y }); seg(c.x - MOLA_L, c.y, c.x + MOLA_L, c.y, molas.length - 1); }
+    else if(c.tipo === 'turbo'){ const d = DIRS[c.dir & 15]; turbos.push({ x: c.x, y: c.y, dx: d[0], dy: d[1], dir: c.dir & 15 }); }
+    else if(c.tipo === 'cachorro') caes.push({ x: c.x, y: c.y });
+    else if(c.tipo === 'chegada') chegada = { x: c.x, y: c.y };
+  }
+  const F = { segs: Float64Array.from(S), tipo: Int16Array.from(T), n: T.length, molas, turbos, caes, chegada, yMax, yFundo: yMax + 500 };
+  montaGrade(F);
+  // o caramelo anda no chão que tem embaixo dele
+  caes.forEach((c, i) => { c.cam = caminhoCao(F, c); c.fase = (i * 97) % CAO_PER; });
+  return F;
+}
+function montaGrade(F){
+  const rows = Math.floor((F.yFundo + 600) / CEL) + 8;
+  const cells = new Array(GCOLS * rows), m = 14, s = F.segs;
+  const cl = (v, a, b) => v < a ? a : v > b ? b : v;
+  for(let k = 0; k < F.n; k++){
+    const o = k * 4, xa = Math.min(s[o], s[o + 2]) - m, xb = Math.max(s[o], s[o + 2]) + m, ya = Math.min(s[o + 1], s[o + 3]) - m, yb = Math.max(s[o + 1], s[o + 3]) + m;
+    const c0 = cl(Math.floor(xa / CEL) - GX0, 0, GCOLS - 1), c1 = cl(Math.floor(xb / CEL) - GX0, 0, GCOLS - 1);
+    const r0 = cl(Math.floor(ya / CEL) + 4, 0, rows - 1), r1 = cl(Math.floor(yb / CEL) + 4, 0, rows - 1);
+    for(let r = r0; r <= r1; r++) for(let c = c0; c <= c1; c++){ const i = r * GCOLS + c; (cells[i] || (cells[i] = [])).push(k); }
+  }
+  F.rows = rows; F.cells = cells; F.marca = new Int32Array(F.n); F.q = 0; F.lista = new Int32Array(Math.max(1, F.n));
+}
+// os segmentos perto de um ponto (sem repetir), na ordem de sempre: o resultado fica em F.lista
+function consulta(F, x, y, r){
+  const q = ++F.q, cl = (v, a, b) => v < a ? a : v > b ? b : v;
+  const c0 = cl(Math.floor((x - r) / CEL) - GX0, 0, GCOLS - 1), c1 = cl(Math.floor((x + r) / CEL) - GX0, 0, GCOLS - 1);
+  const r0 = cl(Math.floor((y - r) / CEL) + 4, 0, F.rows - 1), r1 = cl(Math.floor((y + r) / CEL) + 4, 0, F.rows - 1);
+  let n = 0;
+  for(let rr = r0; rr <= r1; rr++) for(let c = c0; c <= c1; c++){
+    const cell = F.cells[rr * GCOLS + c]; if(!cell) continue;
+    for(let j = 0; j < cell.length; j++){ const k = cell[j]; if(F.marca[k] !== q){ F.marca[k] = q; F.lista[n++] = k; } }
+  }
+  return n;
+}
+// o chão logo abaixo de um ponto (pra pôr cachorro, mola e bandeira em cima do giz)
+function chaoEmbaixo(F, x, y0, alcance){
+  let melhor = null; const s = F.segs;
+  for(let k = 0; k < F.n; k++){
+    if(F.tipo[k] >= 0) continue;
+    const o = k * 4, x1 = s[o], y1 = s[o + 1], x2 = s[o + 2], y2 = s[o + 3];
+    if(x1 === x2 || x < Math.min(x1, x2) || x > Math.max(x1, x2)) continue;
+    const y = y1 + (y2 - y1) * (x - x1) / (x2 - x1);
+    if(y >= y0 && y <= y0 + alcance && (melhor === null || y < melhor)) melhor = y;
+  }
+  return melhor;
+}
+function caminhoCao(F, c){
+  const pts = [];
+  for(let k = 0; k <= 8; k++){ const x = c.x - CAO_VAI + k * CAO_VAI / 4, y = chaoEmbaixo(F, x, c.y - 24, 90); pts.push(x, y === null ? c.y : y); }
+  return pts;
+}
+// onde o caramelo tá no passo n: vai e volta, sem seno
+const PC = new Float64Array(3);
+function posCao(c, n){
+  const m = (n + c.fase) % CAO_PER, h = CAO_PER / 2, u = m < h ? m / h : 2 - m / h, f = u * 8;
+  const i = f >= 8 ? 7 : Math.floor(f), r = f - i, p = c.cam;
+  PC[0] = p[i * 2] + (p[i * 2 + 2] - p[i * 2]) * r;
+  PC[1] = p[i * 2 + 1] + (p[i * 2 + 3] - p[i * 2 + 1]) * r - CAO_R - 1;
+  PC[2] = m < h ? 1 : -1;
+  return PC;
+}
+
+/* ---------- a física do carrinho ---------- */
+function novoEstado(F){
+  const ax = LARGADA[2], ay = LARGADA[3], bx = LARGADA[4], by = LARGADA[5];
+  const dx = bx - ax, dy = by - ay, l = Math.sqrt(dx * dx + dy * dy), ux = dx / l, uy = dy / l, nx = uy, ny = -ux;
+  const p = new Float64Array([ax + ux * 20 + nx * RR, ay + uy * 20 + ny * RR, ax + ux * (20 + LB) + nx * RR, ay + uy * (20 + LB) + ny * RR]);
+  return { p, pa: Float64Array.from(p), v: new Float64Array([ux * V0, uy * V0, ux * V0, uy * V0]),
+    c0: 1, c1: 1, nx, ny, coyote: COYOTE, ar: 0, frente: 1, giro: 0, cambalhotas: 0, segura: false, segT: 0,
+    passos: 0, parado: 0, fim: null, cdT: new Int16Array(F.turbos.length), cdM: new Int16Array(F.molas.length), ev: [] };
+}
+// o dedo encostou: no chão é pulo (na direção do chão); no ar, segurando, vira cambalhota
+function toca(S){
+  if(S.fim || S.segura) return;
+  S.segura = true; S.segT = 0;
+  if(S.coyote > 0){
+    const v = S.v; v[0] += S.nx * PULO; v[1] += S.ny * PULO; v[2] += S.nx * PULO; v[3] += S.ny * PULO;
+    S.coyote = 0; S.ev.push('pulo', 0);
+  }
+}
+function solta(S){ S.segura = false; }
+const CN = new Float64Array(3);
+// empurra um círculo pra fora do giz; devolve se encostou (a normal média e a mola, se for, ficam em CN)
+function empurra(F, p, i, r){
+  let cx = p[i], cy = p[i + 1], nx = 0, ny = 0, mola = -1, hit = 0;
+  const n = consulta(F, cx, cy, r + 2), s = F.segs, L = F.lista, r2 = r * r;
+  for(let j = 0; j < n; j++){
+    const k = L[j], o = k * 4, x1 = s[o], y1 = s[o + 1], dx = s[o + 2] - x1, dy = s[o + 3] - y1, l2 = dx * dx + dy * dy;
+    let u = ((cx - x1) * dx + (cy - y1) * dy) / l2; if(u < 0) u = 0; else if(u > 1) u = 1;
+    const ex = cx - (x1 + dx * u), ey = cy - (y1 + dy * u), d2 = ex * ex + ey * ey;
+    if(d2 >= r2) continue;
+    let d = Math.sqrt(d2), mx, my;
+    if(d > 1e-9){ mx = ex / d; my = ey / d; }
+    else { const l = Math.sqrt(l2); mx = dy / l; my = -dx / l; if(my > 0){ mx = -mx; my = -my; } d = 0; }
+    cx += mx * (r - d); cy += my * (r - d); nx += mx; ny += my; hit = 1;
+    if(F.tipo[k] >= 0) mola = F.tipo[k];
+  }
+  if(!hit) return 0;
+  p[i] = cx; p[i + 1] = cy;
+  const nl = Math.sqrt(nx * nx + ny * ny);
+  if(nl > 1e-9){ CN[0] = nx / nl; CN[1] = ny / nl; } else { CN[0] = 0; CN[1] = -1; }
+  CN[2] = mola;
+  return 1;
+}
+function encosta(F, x, y, r){
+  const n = consulta(F, x, y, r), s = F.segs, L = F.lista, r2 = r * r;
+  for(let j = 0; j < n; j++){
+    const o = L[j] * 4, x1 = s[o], y1 = s[o + 1], dx = s[o + 2] - x1, dy = s[o + 3] - y1;
+    let u = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy); if(u < 0) u = 0; else if(u > 1) u = 1;
+    const ex = x - (x1 + dx * u), ey = y - (y1 + dy * u);
+    if(ex * ex + ey * ey < r2) return true;
+  }
+  return false;
+}
+function barra(p){ const dx = p[2] - p[0], dy = p[3] - p[1], d = Math.sqrt(dx * dx + dy * dy), k = (d - LB) / d * 0.5; p[0] += dx * k; p[1] += dy * k; p[2] -= dx * k; p[3] -= dy * k; }
+// o rolimã no chão: tira o que entra no chão, quica um tiquinho e quase não freia
+function contato(v, i, nx, ny, ox, oy){
+  const vn = v[i] * nx + v[i + 1] * ny;
+  if(vn < 0){ v[i] -= nx * vn; v[i + 1] -= ny * vn; }
+  const on = ox * nx + oy * ny;
+  if(on < -QUIQUE_MIN){ const q = -on * QUIQUE; v[i] += nx * q; v[i + 1] += ny * q; }
+  const tx = -ny, ty = nx, vt = v[i] * tx + v[i + 1] * ty, d = ROLA * PASSO;
+  if(vt > d){ v[i] -= tx * d; v[i + 1] -= ty * d; } else if(vt < -d){ v[i] += tx * d; v[i + 1] += ty * d; } else { v[i] -= tx * vt; v[i + 1] -= ty * vt; }
+}
+// o quanto a barra girou num passo (atan2 pra ângulo pequeno, só com conta e raiz)
+function anguloPasso(sn, cs){
+  if(cs <= 0) return sn >= 0 ? 1.5707963267948966 : -1.5707963267948966;
+  let z = sn / cs;
+  z = z / (1 + Math.sqrt(1 + z * z));
+  const z2 = z * z;
+  return 2 * z * (1 - z2 * (1 / 3 - z2 * (1 / 5 - z2 * (1 / 7 - z2 / 9))));
+}
+function acaba(S, motivo){
+  S.fim = { motivo, passos: S.passos, cs: motivo === 'chegou' ? Math.max(0, Math.round(S.passos * 100 / 120) - 50 * S.cambalhotas) : null };
+  S.ev.push('fim', 0);
+}
+function passo(F, S){
+  if(S.fim) return;
+  S.passos++;
+  const p = S.p, v = S.v, pa = S.pa, dt = PASSO;
+  pa[0] = p[0]; pa[1] = p[1]; pa[2] = p[2]; pa[3] = p[3];
+  v[1] += G * dt; v[3] += G * dt;
+  let bx = p[2] - p[0], by = p[3] - p[1], bl = Math.sqrt(bx * bx + by * by);
+  const ux = bx / bl, uy = by / bl, upx = uy, upy = -ux;
+  if(S.segura) S.segT++;
+  // no ar: segurando, gira pra trás (a frente sobe); soltou, o giro morre rápido
+  if(!S.c0 && !S.c1 && S.ar >= 2){
+    const w = ((v[2] - v[0]) * upx + (v[3] - v[1]) * upy) / LB;
+    let alvo = 0, a = A_SOLTA;
+    if(S.segura && S.segT >= SEG_MIN){ alvo = (S.frente === 1 ? 1 : -1) * W_GIRO; a = A_GIRO; }
+    let dw = alvo - w; const lim = a * dt; if(dw > lim) dw = lim; else if(dw < -lim) dw = -lim;
+    const k = dw * LB / 2;
+    v[2] += upx * k; v[3] += upy * k; v[0] -= upx * k; v[1] -= upy * k;
+  }
+  for(let i = 0; i < 4; i += 2){ const sp = Math.sqrt(v[i] * v[i] + v[i + 1] * v[i + 1]), f = 1 - ARRASTO * sp * dt; v[i] *= f; v[i + 1] *= f; }
+  const o0x = v[0], o0y = v[1], o1x = v[2], o1y = v[3];
+  p[0] += v[0] * dt; p[1] += v[1] * dt; p[2] += v[2] * dt; p[3] += v[3] * dt;
+  let c0 = 0, c1 = 0, n0x = 0, n0y = 0, n1x = 0, n1y = 0, m0 = -1, m1 = -1;
+  for(let it = 0; it < 3; it++){
+    barra(p);
+    if(empurra(F, p, 0, RR)){ c0 = 1; n0x = CN[0]; n0y = CN[1]; if(CN[2] >= 0) m0 = CN[2]; }
+    if(empurra(F, p, 2, RR)){ c1 = 1; n1x = CN[0]; n1y = CN[1]; if(CN[2] >= 0) m1 = CN[2]; }
+  }
+  v[0] = (p[0] - pa[0]) / dt; v[1] = (p[1] - pa[1]) / dt; v[2] = (p[2] - pa[2]) / dt; v[3] = (p[3] - pa[3]) / dt;
+  let impacto = 0;
+  if(c0){ contato(v, 0, n0x, n0y, o0x, o0y); impacto = -(o0x * n0x + o0y * n0y); }
+  if(c1){ contato(v, 2, n1x, n1y, o1x, o1y); impacto = Math.max(impacto, -(o1x * n1x + o1y * n1y)); }
+  // a mola: pisou por cima, voa
+  for(let k = 0; k < S.cdM.length; k++) if(S.cdM[k] > 0) S.cdM[k]--;
+  const mk = m0 >= 0 ? m0 : m1, mny = m0 >= 0 ? n0y : n1y;
+  if(mk >= 0 && S.cdM[mk] === 0 && mny < -0.5){ v[1] = -MOLA_V; v[3] = -MOLA_V; S.cdM[mk] = 24; S.ev.push('mola', mk); c0 = c1 = 0; }
+  for(let i = 0; i < 4; i += 2){ const s2 = v[i] * v[i] + v[i + 1] * v[i + 1]; if(s2 > VMAX * VMAX){ const f = VMAX / Math.sqrt(s2); v[i] *= f; v[i + 1] *= f; } }
+  bx = p[2] - p[0]; by = p[3] - p[1]; bl = Math.sqrt(bx * bx + by * by);
+  const ux2 = bx / bl, uy2 = by / bl;
+  if(!c0 && !c1){
+    S.giro += anguloPasso(ux * uy2 - uy * ux2, ux * ux2 + uy * uy2);
+    S.ar++; if(S.coyote > 0) S.coyote--;
+  } else {
+    let nx = (c0 ? n0x : 0) + (c1 ? n1x : 0), ny = (c0 ? n0y : 0) + (c1 ? n1y : 0);
+    const nl = Math.sqrt(nx * nx + ny * ny);
+    if(nl > 1e-9){ nx /= nl; ny /= nl; } else { nx = 0; ny = -1; }
+    if(S.ar >= AR_MIN){
+      // pousou: de pé conta as cambalhotas; torto demais, capotou
+      if(uy2 * nx - ux2 * ny < PE_MIN){ S.c0 = c0; S.c1 = c1; return acaba(S, 'torto'); }
+      const voltas = Math.floor((Math.abs(S.giro) + 3.141592653589793) / 6.283185307179586);
+      if(voltas > 0){ S.cambalhotas += voltas; S.ev.push('cambalhota', voltas); }
+      S.ev.push('pouso', impacto);
+    } else if(impacto > 160) S.ev.push('pouso', impacto);
+    S.giro = 0; S.ar = 0; S.coyote = COYOTE; S.nx = nx; S.ny = ny;
+    const vb = ((v[0] + v[2]) * ux2 + (v[1] + v[3]) * uy2) / 2;
+    if(vb > 25) S.frente = 1; else if(vb < -25) S.frente = 0;
+  }
+  S.c0 = c0; S.c1 = c1;
+  const mx = (p[0] + p[2]) / 2, my = (p[1] + p[3]) / 2, hx = mx + uy2 * HC, hy = my - ux2 * HC;
+  // a cabeça no chão: capotou
+  if(encosta(F, hx, hy, RH)) return acaba(S, 'capotou');
+  // o caramelo
+  for(let i = 0; i < F.caes.length; i++){
+    const c = posCao(F.caes[i], S.passos), cx = c[0], cy = c[1];
+    const perto = (x, y, r) => (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
+    if(perto(p[0], p[1], CAO_R + 6.5) || perto(p[2], p[3], CAO_R + 6.5) || perto(hx, hy, CAO_R + 7) || perto(mx + uy2 * 12, my - ux2 * 12, CAO_R + 9)) return acaba(S, 'cachorro');
+  }
+  // o turbo: passou por dentro, ganha velocidade pro lado da seta
+  for(let i = 0; i < F.turbos.length; i++){
+    const t = F.turbos[i];
+    if(S.cdT[i] > 0) S.cdT[i]--;
+    const dx = mx - t.x, dy = my - t.y;
+    if(dx * dx + dy * dy < TURBO_R * TURBO_R){
+      if(S.cdT[i] === 0){
+        for(let j = 0; j < 4; j += 2){ const a = v[j] * t.dx + v[j + 1] * t.dy; if(a < TURBO_V){ v[j] += t.dx * (TURBO_V - a); v[j + 1] += t.dy * (TURBO_V - a); } }
+        S.ev.push('turbo', i);
+      }
+      S.cdT[i] = 30;
+    }
+  }
+  const ch = F.chegada;
+  if(ch && mx >= ch.x - CHEG_L && mx <= ch.x + CHEG_L && my >= ch.y - CHEG_A && my <= ch.y + 16) return acaba(S, 'chegou');
+  if(mx < -8 || mx > LARG + 8) return acaba(S, 'barranco');
+  if(my > F.yFundo) return acaba(S, 'caiu');
+  const vx = (v[0] + v[2]) / 2, vy = (v[1] + v[3]) / 2;
+  if((c0 || c1) && vx * vx + vy * vy < 64) S.parado++; else S.parado = 0;
+  if(S.parado > PARADO_MAX) return acaba(S, 'empacou');
+  if(S.passos >= T_MAX) return acaba(S, 'tempo');
+}
+// desce a fase com uma lista de toques ({t em segundos, tipo 'toca' ou 'solta'}); puro e determinístico
+function simula(fase, toques){
+  const F = fase && fase.segs ? fase : compila(fase);
+  const S = novoEstado(F);
+  const evs = (toques || []).map((e, i) => ({ n: Math.max(0, Math.round(e.t / PASSO)), k: e.tipo === 'toca' ? 1 : 0, i })).sort((a, b) => a.n - b.n || a.i - b.i);
+  let j = 0;
+  while(!S.fim){
+    while(j < evs.length && evs[j].n <= S.passos){ if(evs[j].k) toca(S); else solta(S); j++; }
+    S.ev.length = 0;
+    passo(F, S);
+  }
+  return resumo(S);
+}
+// o mesmo, com os toques gravados em passos (é assim que o fantasma viaja no link): toca, solta, toca...
+function rodaGravado(F, eventos, S){
+  S = S || novoEstado(F); let j = 0;
+  while(!S.fim){
+    while(j < eventos.length && eventos[j] <= S.passos){ if(j % 2 === 0) toca(S); else solta(S); j++; }
+    S.ev.length = 0; passo(F, S);
+  }
+  return resumo(S);
+}
+function resumo(S){
+  const m = S.fim.motivo;
+  return { chegou: m === 'chegou', tempo: S.fim.cs === null ? null : S.fim.cs / 100, cs: S.fim.cs, capotou: m === 'capotou' || m === 'torto' || m === 'cachorro', motivo: m, cambalhotas: S.cambalhotas, passos: S.passos };
+}
+
+
+/* ---------- o código do link: a fase inteira em letras, dígitos, - e _ ---------- */
+// é base64url sem "=": cada letra carrega 6 bits. Os números vão em Exp-Golomb (número pequeno, código curto)
+// e os traços em diferenças de um ponto pro outro. Começa com "dv1" (a versão) e fecha com uma conferência de 12 bits,
+// pra link cortado no meio do caminho (zap adora fazer isso) não abrir uma ladeira quebrada.
+const ALFA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const PREFIXO = 'dv1';
+const NOME_MAX = 14, CORRENTE_MAX = 6;
+function Escreve(){ this.b = []; }
+Escreve.prototype.n = function(v, k){ for(let i = k - 1; i >= 0; i--) this.b.push((v >>> i) & 1); };
+Escreve.prototype.eg = function(v, k){ const w = v + (1 << k); let nb = 0; for(let t = w; t > 0; t >>>= 1) nb++; for(let i = 0; i < nb - k - 1; i++) this.b.push(0); this.n(w, nb); };
+Escreve.prototype.sz = function(v, k){ this.eg(v < 0 ? -2 * v - 1 : 2 * v, k); };
+Escreve.prototype.txt = function(s){ const c = [...(s || '')].slice(0, NOME_MAX).map(ch => { const k = ch.codePointAt(0); return k > 31 && k < 256 ? k : 63; }); this.n(c.length, 4); c.forEach(k => this.n(k, 8)); };
+const tamEG = (v, k) => { const w = v + (1 << k); let nb = 0; for(let t = w; t > 0; t >>>= 1) nb++; return 2 * nb - k - 1; };
+const zz = v => v < 0 ? -2 * v - 1 : 2 * v;
+function Le(bits){ this.b = bits; this.i = 0; }
+Le.prototype.bit = function(){ if(this.i >= this.b.length) throw new Error('curto'); return this.b[this.i++]; };
+Le.prototype.n = function(k){ let v = 0; for(let i = 0; i < k; i++) v = v * 2 + this.bit(); return v; };
+Le.prototype.eg = function(k){ let z = 0; while(this.bit() === 0){ if(++z > 24) throw new Error('eg'); } let w = 1; for(let i = 0; i < z + k; i++) w = w * 2 + this.bit(); return w - (1 << k); };
+Le.prototype.sz = function(k){ const u = this.eg(k); return u % 2 ? -(u + 1) / 2 : u / 2; };
+Le.prototype.txt = function(){ const n = this.n(4); let s = ''; for(let i = 0; i < n; i++) s += String.fromCharCode(this.n(8)); return s; };
+function soma12(b, ate){ let h = 0; for(let i = 0; i < ate; i++) h = (h * 31 + b[i] + 7) % 4093; return h; }
+
+function codifica(fase){
+  const w = new Escreve();
+  const tr = (fase.tracos || []).filter(t => t.pts && t.pts.length >= 4);
+  // o k que deixa os traços mais curtos
+  let k = 2, melhor = Infinity;
+  for(let kk = 0; kk <= 6; kk++){ let t = 0; for(const x of tr) for(let i = 2; i < x.pts.length; i++) t += tamEG(zz(x.pts[i] - x.pts[i - 2]), kk); if(t < melhor){ melhor = t; k = kk; } }
+  // o fantasma pode ter zero toques (a descida sem encostar no dedo também é uma descida)
+  const fant = Array.isArray(fase.fantasma) ? fase.fantasma : null;
+  w.n(fant ? 1 : 0, 1); w.n(0, 3);
+  w.txt(fase.autor || '');
+  w.n(k, 3);
+  w.eg(tr.length, 2);
+  for(const t of tr){
+    w.n(t.cor & 3, 2); w.eg(t.pts.length / 2 - 2, 3); w.n(t.pts[0], 9); w.n(t.pts[1], 13);
+    for(let i = 2; i < t.pts.length; i++) w.sz(t.pts[i] - t.pts[i - 2], k);
+  }
+  const cs = fase.carimbos || [];
+  w.eg(cs.length, 1);
+  for(const c of cs){ const ti = TIPOS.indexOf(c.tipo); w.n(ti, 2); w.n(c.x, 9); w.n(c.y, 13); if(ti === 1) w.n(c.dir & 15, 4); }
+  const co = (fase.corrente || []).slice(-CORRENTE_MAX);
+  w.n(co.length, 3);
+  for(const c of co){ w.txt(c.nome); w.eg(c.cs, 9); }
+  if(fant){ w.eg(fant.length, 2); let a = 0; for(const n of fant){ w.eg(n - a, 4); a = n; } }
+  w.n(soma12(w.b, w.b.length), 12);
+  let s = PREFIXO;
+  for(let i = 0; i < w.b.length; i += 6){ let v = 0; for(let j = 0; j < 6; j++) v = v * 2 + (w.b[i + j] || 0); s += ALFA[v]; }
+  return s;
+}
+function decodifica(cod){
+  try{
+    if(typeof cod !== 'string' || cod.slice(0, 3) !== PREFIXO || cod.length > 12000) return null;
+    const bits = [];
+    for(let i = 3; i < cod.length; i++){ const v = ALFA.indexOf(cod[i]); if(v < 0) return null; for(let j = 5; j >= 0; j--) bits.push((v >> j) & 1); }
+    const r = new Le(bits);
+    const temFant = r.n(1); r.n(3);
+    const autor = r.txt();
+    const k = r.n(3);
+    const nt = r.eg(2); if(nt > 400) return null;
+    const tracos = []; let tot = 0;
+    for(let i = 0; i < nt; i++){
+      const cor = r.n(2), np = r.eg(3) + 2; tot += np; if(tot > 8000) return null;
+      const pts = [r.n(9), r.n(13)];
+      for(let j = 2; j < np * 2; j++) pts.push(pts[j - 2] + r.sz(k));
+      for(let j = 0; j < pts.length; j += 2) if(pts[j] < 0 || pts[j] > LARG || pts[j + 1] < 0 || pts[j + 1] > ALT_MAX) return null;
+      tracos.push({ cor, pts });
+    }
+    const nc = r.eg(1); if(nc > 80) return null;
+    const carimbos = [];
+    for(let i = 0; i < nc; i++){
+      const ti = r.n(2), c = { tipo: TIPOS[ti], x: r.n(9), y: r.n(13) };
+      if(ti === 1) c.dir = r.n(4);
+      if(c.x > LARG || c.y > ALT_MAX) return null;
+      carimbos.push(c);
+    }
+    const nco = r.n(3); if(nco > CORRENTE_MAX) return null;
+    const corrente = [];
+    for(let i = 0; i < nco; i++){ const nome = r.txt(), cs = r.eg(9); corrente.push({ nome, cs }); }
+    let fantasma = null;
+    if(temFant){ const ne = r.eg(2); if(ne > 4000) return null; fantasma = []; let a = 0; for(let i = 0; i < ne; i++){ a += r.eg(4); fantasma.push(a); } }
+    const conta = soma12(bits, r.i);
+    if(r.n(12) !== conta) return null;
+    return { autor, tracos, carimbos, corrente, fantasma };
+  }catch(e){ return null; }
+}
+// a identidade da ladeira (só o desenho): o recorde de cada uma mora aqui
+function idFase(fase){
+  const s = codifica({ autor: '', tracos: fase.tracos, carimbos: fase.carimbos, corrente: [], fantasma: null });
+  let h = 2166136261;
+  for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h.toString(36);
+}
+
+
+/* ---------- as ladeiras feitas por nós e a ladeira do dia ---------- */
+// seno sem o seno do navegador (série de Taylor): a ladeira do dia tem que sair igual em todo aparelho
+function sen(x){
+  const DP = 6.283185307179586, P = 3.141592653589793, M = 1.5707963267948966;
+  x = x - DP * Math.floor(x / DP + 0.5);
+  if(x > M) x = P - x; else if(x < -M) x = -P - x;
+  const x2 = x * x;
+  return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72 * (1 - x2 / 110)))));
+}
+const cos_ = x => sen(x + 1.5707963267948966);
+const GRAU = 0.017453292519943295;
+function sorteio(semente){ let a = semente | 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function arco(cx, cy, r, a0, a1, pg){ const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / (pg || 9))), o = []; for(let i = 0; i <= n; i++){ const a = (a0 + (a1 - a0) * i / n) * GRAU; o.push(Math.round(cx + cos_(a) * r), Math.round(cy + sen(a) * r)); } return o; }
+function junta(...ps){ const o = []; for(const p of ps) for(let i = 0; i < p.length; i += 2){ if(o.length && o[o.length - 2] === p[i] && o[o.length - 1] === p[i + 1]) continue; o.push(p[i], p[i + 1]); } return o; }
+// inclinação → graus, sem o atan do navegador
+function grausDe(s){ const z = s / (1 + Math.sqrt(1 + s * s)), z2 = z * z; return 2 * z * (1 - z2 * (1 / 3 - z2 * (1 / 5 - z2 * (1 / 7 - z2 / 9)))) / GRAU; }
+// a direção do turbo mais perto de um ângulo (graus, 0 = direita, 90 = pra baixo)
+const dirDe = g => ((Math.round(g / 22.5) % 16) + 16) % 16;
+
+// A serra: andares em zigue-zague. Cada andar desce pra um lado e acaba numa beirada; o de baixo pega o carrinho
+// numa curva grande colada no barranco (ele sobe, perde força e volta) e desce pro outro lado.
+// No caminho: lombada, buraco, turbo, cachorro, mola. A beirada pode ser um chutador (voa mais).
+function serra(spec){
+  const tracos = [], carimbos = [], MURO = 412, BEIRA = spec.beira || 270;
+  let x = 128, y = 150, d = 1;
+  for(let k = 0; k < spec.andares.length; k++){
+    const A = spec.andares[k], P0 = spec.andares[k + 1], cor = A.cor || 0, desce = A.desce;
+    // queda grande pro próximo andar pede beirada mais longe do barranco (senão ele bate alto na curva)
+    const beira = A.beira || (P0 && (P0.queda || 66) > 110 ? 230 : BEIRA), fimX = d > 0 ? beira : LARG - beira;
+    let partes = [];
+    if(k > 0){
+      const R = A.raio || 96, lado = -d, wx = lado > 0 ? MURO : LARG - MURO, cx = wx - lado * R, cy = y - R;
+      partes.push([wx, Math.max(0, cy - (A.parede || 70))], lado > 0 ? arco(cx, cy, R, 0, 90) : arco(cx, cy, R, 180, 90));
+    } else partes.push([x, y]);
+    const x0 = x, y0 = y; let off = 0;
+    const fx = xx => y0 + Math.abs(xx - x0) * desce + off;
+    const xAt = em => Math.round(x0 + (fimX - x0) * em);
+    const itens = (A.itens || []).slice().sort((a, b) => a.em - b.em);
+    for(const it of itens){
+      const xi = xAt(it.em);
+      if(it.k === 'lombada'){
+        const w = it.w || 60, h = it.h || 14, n = 8, xa = xi - d * w / 2;
+        partes.push([Math.round(xa), Math.round(fx(xa))]);
+        for(let i = 1; i <= n; i++){ const xx = xa + d * w * i / n; partes.push([Math.round(xx), Math.round(fx(xx) - h * sen(3.141592653589793 * i / n))]); }
+      } else if(it.k === 'buraco'){
+        const w = it.w || 50, xa = xi - d * w / 2, xb = xi + d * w / 2;
+        partes.push([Math.round(xa), Math.round(fx(xa))]);
+        tracos.push({ cor, pts: junta(...partes) });
+        off += it.cai || 8;
+        partes = [[Math.round(xb), Math.round(fx(xb))]];
+      } else if(it.k === 'meiofio' || it.k === 'muro'){
+        // um degrau no meio do chão: o meio-fio pede pulo, o muro pede mola
+        const h = it.h || (it.k === 'muro' ? 90 : 18), w = it.w || 8, ya = Math.round(fx(xi));
+        partes.push([xi, ya], [xi, ya - h], [xi + d * w, ya - h], [xi + d * w, Math.round(fx(xi + d * w))]);
+      } else if(it.k === 'turbo'){
+        const g = grausDe(desce);
+        carimbos.push({ tipo: 'turbo', x: xi, y: Math.round(fx(xi)) - 16, dir: dirDe(d > 0 ? g : 180 - g) });
+      } else if(it.k === 'cachorro') carimbos.push({ tipo: 'cachorro', x: xi, y: Math.round(fx(xi)) });
+      else if(it.k === 'mola') carimbos.push({ tipo: 'mola', x: xi, y: Math.round(fx(xi)) - 3 });
+    }
+    let yLip;
+    if(k === spec.andares.length - 1){
+      // o último andar acaba num reto com a bandeira e um murinho
+      const yF = Math.round(fx(fimX)), reto = spec.reto || 70, xr = fimX + d * reto;
+      partes.push([fimX, yF], [xr, yF + 2], [xr + d * 12, yF - 12]);
+      carimbos.push({ tipo: 'chegada', x: Math.round(fimX + d * reto * 0.5), y: yF + 1 });
+    } else if(A.chuta){
+      // o chutador: o fim do andar sobe numa curvinha e joga o carrinho pro alto
+      const xa = fimX - d * 46, ya = Math.round(fx(xa));
+      partes.push([Math.round(xa), ya], [Math.round(fimX - d * 22), ya + 3], [Math.round(fimX - d * 8), ya - 2], [fimX, ya - A.chuta]);
+      yLip = ya - A.chuta;
+    } else {
+      // a beirada: o fim do andar deita um pouco, pra o carrinho sair reto
+      const xa = fimX - d * 34, ya = Math.round(fx(xa));
+      partes.push([Math.round(xa), ya], [fimX, ya + 4]);
+      yLip = ya + 4;
+    }
+    tracos.push({ cor, pts: junta(...partes) });
+    const P = spec.andares[k + 1];
+    if(P){
+      const R = P.raio || 96, cx = (d > 0 ? MURO : LARG - MURO) - d * R;
+      // o chão do próximo fica abaixo da beirada o bastante pra caber a cabeça quando ele voltar por baixo
+      y = Math.round(yLip + (P.queda || 66) - Math.abs(cx - fimX) * P.desce);
+      x = cx;
+    }
+    d = -d;
+  }
+  return { autor: spec.autor || '', tracos, carimbos, corrente: [], fantasma: null };
+}
+
+// o piloto robô: pula os cachorros que vêm pela frente (é com ele que a ladeira do dia é conferida, e é ele que desce na tela de entrada)
+function piloto(F, S, cfg){
+  const antes = (cfg && cfg.antes) || 0.36;
+  if(S.segura){ return S.segT >= 3 ? 0 : -1; }
+  // só pula de chão reto (na curva o pulo sai torto) e com velocidade
+  if(S.coyote < COYOTE || S.ny > -0.8) return -1;
+  const p = S.p, v = S.v, mx = (p[0] + p[2]) / 2, my = (p[1] + p[3]) / 2, vx = (v[0] + v[2]) / 2;
+  if(Math.abs(vx) < 30) return -1;
+  // degrau em pé na frente (meio-fio): pula um tiquinho antes
+  const fr = S.frente === 1 ? 2 : 0, ux = (p[2] - p[0]) / LB * (S.frente === 1 ? 1 : -1), uy = (p[3] - p[1]) / LB * (S.frente === 1 ? 1 : -1);
+  const dObs = degrauNaFrente(F, p[fr], p[fr + 1], ux, uy, Math.abs(vx) * 0.32 + 14);
+  if(dObs !== null && dObs > Math.abs(vx) * 0.12){
+    // só se o chão continua até o degrau (na beirada, o que aparece na frente é a curva do andar de baixo)
+    const qx = p[fr] + ux * dObs * 0.6, qy = p[fr + 1] + uy * dObs * 0.6, ch = chaoEmbaixo(F, qx, qy, 24);
+    if(ch !== null) return 1;
+  }
+  for(let i = 0; i < F.caes.length; i++){
+    const c = posCao(F.caes[i], S.passos), dx = c[0] - mx, dy = c[1] - my;
+    // só o cachorro do chão em que ele tá: a altura que o chão teria lá, seguindo a tábua
+    const ux = p[2] - p[0], uy = p[3] - p[1];
+    if(dx * vx <= 0 || Math.abs(ux) < 1 || Math.abs(dy - uy / ux * dx) > 24) continue;
+    const t = (Math.abs(dx) - 26) / Math.abs(vx);
+    if(t > 0 && t < antes) return 1;
+  }
+  return -1;
+}
+// a distância até um segmento quase em pé cruzando a linha da tábua, na frente da roda da frente
+function degrauNaFrente(F, ox, oy, ux, uy, L){
+  const n = consulta(F, ox + ux * L / 2, oy + uy * L / 2, L / 2 + 12), s = F.segs; let melhor = null;
+  for(let j = 0; j < n; j++){
+    const k = F.lista[j], o = k * 4, ax = s[o], ay = s[o + 1], bx = s[o + 2] - ax, by = s[o + 3] - ay;
+    if(Math.abs(bx) > Math.abs(by) * 0.5) continue;
+    // só degrau que nasce do chão em que ele tá (a ponta de baixo na altura do chão)
+    const ha = (ax - ox) * uy - (ay - oy) * ux, hb = (s[o + 2] - ox) * uy - (s[o + 3] - oy) * ux, hb0 = Math.min(-ha, -hb);
+    if(hb0 < -17 || hb0 > -3) continue;
+    const den = ux * by - uy * bx; if(Math.abs(den) < 1e-9) continue;
+    const t = ((ax - ox) * by - (ay - oy) * bx) / den, u = ((ax - ox) * uy - (ay - oy) * ux) / den;
+    if(t > 0 && t < L && u >= 0 && u <= 1 && (melhor === null || t < melhor)) melhor = t;
+  }
+  return melhor;
+}
+// desce com o robô e devolve os toques que ele deu (em passos) e o resultado
+function desceRobo(F, cfg){
+  const S = novoEstado(F), ev = [];
+  while(!S.fim){
+    const a = piloto(F, S, cfg);
+    if(a === 1){ toca(S); ev.push(S.passos); } else if(a === 0){ solta(S); ev.push(S.passos); }
+    S.ev.length = 0; passo(F, S);
+  }
+  return { r: resumo(S), ev };
+}
+
+// a ladeira do dia: a data vira a semente; a serra sai sorteada e o robô confere que dá pra chegar.
+// Não deu, sorteia de novo com outra semente (sempre na mesma ordem: sai igual pra todo mundo).
+function geraDia(semente){
+  const r = sorteio(semente), na = 6 + Math.floor(r() * 3), andares = [];
+  for(let k = 0; k < na; k++){
+    const A = { desce: Math.round((0.24 + r() * 0.12) * 100) / 100, raio: 84 + Math.floor(r() * 16), queda: 84 + Math.floor(r() * 22), itens: [], cor: r() < 0.25 ? 1 + Math.floor(r() * 3) : 0 };
+    const sorte = r();
+    // o cachorro fica na parte larga do andar (longe do andar de cima), e o andar desce mais pra caber o pulo
+    if(k > 0 && sorte < 0.3){ A.itens.push({ k: 'cachorro', em: 0.74 + r() * 0.14 }); A.queda = 96 + Math.floor(r() * 16); }
+    else if(sorte < 0.55) A.itens.push({ k: 'lombada', em: 0.35 + r() * 0.35, h: 8 + Math.floor(r() * 10), w: 50 + Math.floor(r() * 30) });
+    else if(sorte < 0.75) A.itens.push({ k: 'buraco', em: 0.55 + r() * 0.3, w: 26 + Math.floor(r() * 22) });
+    // turbo só em andar manso (no ladeirão ele joga o carrinho longe demais)
+    if(k > 0 && A.desce < 0.3 && r() < 0.35) A.itens.push({ k: 'turbo', em: 0.12 + r() * 0.1 });
+    if(k < na - 1 && r() < 0.25) A.chuta = 5 + Math.floor(r() * 5);
+    andares.push(A);
+  }
+  return serra({ autor: 'Ladeira do dia', andares, reto: 60 + Math.floor(r() * 30) });
+}
+function diaHoje(agora){
+  const d = new Date((agora === undefined ? Date.now() : agora) - 3 * 3600 * 1000);
+  return { a: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+}
+function ladeiraDoDia(dia){
+  dia = dia || diaHoje();
+  const base = dia.a * 10000 + dia.m * 100 + dia.d;
+  for(let t = 0; t < 40; t++){
+    const f = geraDia(base * 31 + t * 7919), F = compila(f), r = desceRobo(F);
+    if(r.r.chegou && r.r.cs >= 500 && r.r.cs <= 2000){ f.dia = dia; f.par = r.r.cs; f.robo = r.ev; return f; }
+  }
+  const f = serra({ autor: 'Ladeira do dia', andares: [{ desce: .35 }, { desce: .3 }, { desce: .3 }, { desce: .25 }] });
+  f.dia = dia; return f;
+}
+
+// as cinco da casa, da fácil à safada (todas conferidas pelo robô: dá pra chegar)
+const PRONTAS = [
+  { nome: 'Pra aquecer', sub: 'Desce sozinha. Só não atrapalha.', spec: { andares: [{ desce: .34 }, { desce: .3, queda: 96, itens: [{ k: 'lombada', em: .6, h: 10 }] }, { desce: .32, cor: 1, queda: 100 }, { desce: .3, queda: 104 }, { desce: .3, queda: 96, itens: [{ k: 'lombada', em: .5, h: 9 }] }, { desce: .28, queda: 100, cor: 3 }, { desce: .24, queda: 96 }] } },
+  { nome: 'Lombada', sub: 'Lombada, buraco e meio-fio. No meio-fio, pula.', spec: { andares: [{ desce: .34, itens: [{ k: 'lombada', em: .45, h: 14 }, { k: 'lombada', em: .75, h: 12 }] }, { desce: .3, queda: 100, itens: [{ k: 'buraco', em: .7, w: 40 }] }, { desce: .32, queda: 104, cor: 1, itens: [{ k: 'meiofio', em: .86, h: 16 }] }, { desce: .3, queda: 96, itens: [{ k: 'lombada', em: .4, h: 14 }, { k: 'lombada', em: .7, h: 14 }] }, { desce: .32, queda: 104, itens: [{ k: 'buraco', em: .75, w: 46 }] }, { desce: .3, queda: 100, cor: 2, itens: [{ k: 'meiofio', em: .84, h: 16 }] }, { desce: .24, queda: 96, itens: [{ k: 'lombada', em: .5, h: 16 }] }] } },
+  { nome: 'Cachorro do vizinho', sub: 'Quatro caramelos de guarda. Pula os quatro.', spec: { andares: [{ desce: .34 }, { desce: .3, queda: 112, itens: [{ k: 'cachorro', em: .84 }] }, { desce: .28, queda: 110, cor: 2, itens: [{ k: 'lombada', em: .35, h: 10 }, { k: 'cachorro', em: .72 }] }, { desce: .32, queda: 96 }, { desce: .28, queda: 112, itens: [{ k: 'cachorro', em: .72 }] }, { desce: .3, queda: 100, cor: 1, itens: [{ k: 'lombada', em: .45, h: 10 }] }, { desce: .24, queda: 112, itens: [{ k: 'cachorro', em: .62 }] }] } },
+  { nome: 'Mola maluca', sub: 'A mola te manda pro céu. Volta inteiro.', spec: { andares: [{ desce: .2, itens: [{ k: 'mola', em: .35 }, { k: 'muro', em: .53, h: 70 }] }, { desce: .26, parede: 292, raio: 106, queda: 97, cor: 3, itens: [{ k: 'turbo', em: .14 }, { k: 'buraco', em: .52, w: 76, cai: 4 }] }, { desce: .3, queda: 100 }, { desce: .3, queda: 104, itens: [{ k: 'lombada', em: .4, h: 12 }] }, { desce: .26, queda: 96, itens: [{ k: 'turbo', em: .16 }, { k: 'buraco', em: .62, w: 60, cai: 4 }] }, { desce: .3, queda: 104, cor: 1 }, { desce: .24, queda: 100, itens: [{ k: 'lombada', em: .5, h: 12 }] }] } },
+  { nome: 'A safada', sub: 'Tudo junto, e o caramelo te esperando. Duvido.', spec: { andares: [{ desce: .12, itens: [{ k: 'mola', em: .19 }, { k: 'muro', em: .56, h: 88 }] }, { desce: .24, parede: 237, raio: 116, queda: 83, cor: 2, itens: [{ k: 'turbo', em: .16 }, { k: 'buraco', em: .52, w: 81, cai: 4 }] }, { desce: .25, queda: 114, itens: [{ k: 'lombada', em: .43, h: 12 }, { k: 'cachorro', em: .8 }] }, { desce: .26, queda: 114, chuta: 6, cor: 3, itens: [{ k: 'meiofio', em: .89, h: 16 }] }, { desce: .3, queda: 96, itens: [{ k: 'buraco', em: .7, w: 50 }] }, { desce: .26, queda: 110, chuta: 7, itens: [{ k: 'cachorro', em: .78 }] }, { desce: .3, queda: 104, cor: 1, itens: [{ k: 'lombada', em: .4, h: 14 }, { k: 'meiofio', em: .86, h: 16 }] }, { desce: .24, queda: 116, itens: [{ k: 'cachorro', em: .7 }] }] } }
+];
+PRONTAS.forEach((p, i) => { p.fase = serra(Object.assign({ autor: 'Duvido' }, p.spec)); p.i = i; });
+
+
+/* ======================= a página: desenho e som ======================= */
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const guarda = (k, v) => { try{ localStorage.setItem('duvido-' + k, v); }catch(e){} };
+const le = k => { try{ return localStorage.getItem('duvido-' + k); }catch(e){ return null; } };
+const leJSON = (k, padrao) => { try{ const v = JSON.parse(le(k)); return v === null || v === undefined ? padrao : v; }catch(e){ return padrao; } };
+const guardaJSON = (k, v) => guarda(k, JSON.stringify(v));
+const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dedoTela = matchMedia('(pointer: coarse)').matches;
+const fmt2 = cs => (cs / 100).toFixed(2).replace('.', ',');
+const fmt1 = cs => (Math.round(cs / 10) / 10).toFixed(1).replace('.', ',');
+const F_TIT = '"Bungee","Arial Black",Impact,sans-serif', F_TXT = '"Rubik",system-ui,sans-serif', F_GIZ = '"Permanent Marker","Comic Sans MS","Chalkboard SE","Segoe Print",sans-serif';
+const app = $('app'), cv = $('c'), ctx = cv.getContext('2d'), tiraCv = $('tira'), tctx = tiraCv.getContext('2d');
+
+/* ---------- a tela: a coluna do mundo e a tira da direita ---------- */
+let SW = 0, SH = 0, DPR = 1, K = 1, COLX = 0, COLW = 0, TIRAX = 0, TIRAW = 22, VH = 800;
+function medeTela(){
+  const r = app.getBoundingClientRect(); SW = Math.max(200, r.width); SH = Math.max(200, r.height);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  TIRAW = SW < 600 ? 22 : 26;
+  if(SW < 600){ COLW = SW - TIRAW; COLX = 0; TIRAX = COLW; }
+  else { COLW = Math.min(520, SW - 2 * (TIRAW + 34)); COLX = Math.round((SW - COLW) / 2); TIRAX = COLX + COLW + 14; }
+  K = COLW / LARG; VH = SH / K;
+  cv.width = Math.round(SW * DPR); cv.height = Math.round(SH * DPR);
+  tiraCv.width = Math.round(TIRAW * DPR); tiraCv.height = Math.round(SH * DPR);
+  app.style.setProperty('--col-x', COLX + 'px'); app.style.setProperty('--col-w', COLW + 'px');
+  app.style.setProperty('--tira-x', TIRAX + 'px'); app.style.setProperty('--tira-w', TIRAW + 'px');
+  ladrilhos.clear(); tiraCache = null; padroes.delete(ctx);
+}
+
+/* ---------- as texturas, feitas uma vez ---------- */
+const CORES_GIZ = [[243, 238, 226], [255, 214, 74], [255, 111, 174], [108, 196, 255]];
+const NOMES_COR = ['branco', 'amarelo', 'rosa', 'azul'];
+function texAsfalto(){
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), r = sorteio(4242);
+  x.fillStyle = '#1C1B21'; x.fillRect(0, 0, 256, 256);
+  for(let i = 0; i < 11000; i++){
+    const claro = r() < .5, g = claro ? 34 + r() * 22 : 13 + r() * 9, quente = r() < .12 ? 10 : 0, s = r() < .88 ? 1 : 2;
+    x.fillStyle = `rgba(${g + quente | 0},${g | 0},${g + 4 | 0},${.3 + r() * .55})`; x.fillRect(r() * 256 | 0, r() * 256 | 0, s, s);
+  }
+  for(let i = 0; i < 300; i++){ x.fillStyle = `rgba(${160 + r() * 60 | 0},${150 + r() * 50 | 0},${140 + r() * 40 | 0},${.06 + r() * .14})`; x.beginPath(); x.arc(r() * 256, r() * 256, .6 + r() * 1.5, 0, 7); x.fill(); }
+  return c;
+}
+function texGiz(cor, sem){
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), img = x.createImageData(64, 64), r = sorteio(sem);
+  for(let i = 0; i < 4096; i++){
+    const a = r(), al = a < .13 ? 0 : a < .3 ? 110 + r() * 60 : 205 + r() * 50, v = .92 + r() * .08;
+    img.data[i * 4] = cor[0] * v; img.data[i * 4 + 1] = cor[1] * v; img.data[i * 4 + 2] = cor[2] * v; img.data[i * 4 + 3] = al;
+  }
+  x.putImageData(img, 0, 0); return c;
+}
+function texGrao(){
+  const c = document.createElement('canvas'); c.width = c.height = 120; const x = c.getContext('2d'), r = sorteio(31);
+  for(let i = 0; i < 1300; i++){ x.fillStyle = r() < .5 ? `rgba(255,255,255,${.015 + r() * .03})` : `rgba(0,0,0,${.05 + r() * .08})`; x.fillRect(r() * 120 | 0, r() * 120 | 0, 1, 1); }
+  return c;
+}
+const TEX = { asfalto: texAsfalto(), giz: CORES_GIZ.map((c, i) => texGiz(c, 70 + i)) };
+try{ document.documentElement.style.setProperty('--grao', `url(${texGrao().toDataURL()})`); }catch(e){}
+
+/* ---------- a cena: a fase que tá na tela (traços com caixa, carimbos, a decoração) ---------- */
+let CENA = null;
+function montaCena(fase, F){
+  const tracos = fase.tracos.map(t => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for(let i = 0; i < t.pts.length; i += 2){ x0 = Math.min(x0, t.pts[i]); x1 = Math.max(x1, t.pts[i]); y0 = Math.min(y0, t.pts[i + 1]); y1 = Math.max(y1, t.pts[i + 1]); } return { cor: t.cor, pts: t.pts, bb: [x0, y0, x1, y1] }; });
+  let s = 7; for(const t of fase.tracos) s = (s * 31 + t.pts.length + (t.pts[1] || 0)) % 100003;
+  CENA = { fase, F: F || compila(fase), tracos, sem: s, yMax: (F || null) ? F.yMax : null };
+  CENA.yMax = CENA.F.yMax;
+  ladrilhos.clear(); tiraCache = null;
+}
+
+/* ---------- os ladrilhos: o asfalto, a decoração e o giz, desenhados uma vez por pedaço ---------- */
+const TH = 256;
+const ladrilhos = new Map();
+function ladrilho(t){
+  const chave = t;
+  let L = ladrilhos.get(chave); if(L) return L;
+  const W = Math.round(COLW * DPR), H = Math.ceil(TH * K * DPR) + 2;
+  L = document.createElement('canvas'); L.width = W; L.height = H;
+  const x = L.getContext('2d');
+  const pa = x.createPattern(TEX.asfalto, 'repeat');
+  x.fillStyle = pa; x.fillRect(0, 0, W, H);
+  x.setTransform(K * DPR, 0, 0, K * DPR, 0, -t * TH * K * DPR);
+  if(CENA){
+    for(let u = t - 1; u <= t + 1; u++) decora(x, u);
+    faixas(x, t);
+    tabua(x);
+    const y0 = t * TH - 40, y1 = (t + 1) * TH + 40;
+    CENA.tracos.forEach((tr, i) => { if(tr.bb[3] >= y0 && tr.bb[1] <= y1) gizTraco(x, tr.pts, tr.cor, i); });
+  }
+  ladrilhos.set(chave, L);
+  if(ladrilhos.size > 28) ladrilhos.delete(ladrilhos.keys().next().value);
+  return L;
+}
+// o giz: a poeira em volta, o miolo com grão e uma segunda passada, tudo com um tremidinho de mão
+function caminhoGiz(x, pts, sem, amp){
+  x.beginPath();
+  let n = 0;
+  for(let i = 0; i < pts.length; i += 2){
+    if(i === 0){ x.moveTo(pts[0], pts[1]); continue; }
+    const ax = pts[i - 2], ay = pts[i - 1], bx = pts[i], by = pts[i + 1], dx = bx - ax, dy = by - ay, l = Math.hypot(dx, dy) || 1, q = Math.max(1, Math.round(l / 7));
+    for(let k = 1; k <= q; k++){
+      const f = k / q, j = k === q ? 0 : (((Math.sin((n++ + sem) * 12.9898) * 43758.5453) % 1) - .5) * 2 * amp;
+      x.lineTo(ax + dx * f - dy / l * j, ay + dy * f + dx / l * j);
+    }
+  }
+}
+const padroes = new WeakMap();
+function padraoGiz(x, cor){
+  let m = padroes.get(x); if(!m){ m = []; padroes.set(x, m); }
+  if(!m[cor]){ m[cor] = x.createPattern(TEX.giz[cor] || TEX.giz[0], 'repeat'); try{ const s = 1 / (K * DPR); m[cor].setTransform(new DOMMatrix([s, 0, 0, s, 0, 0])); }catch(e){} }
+  return m[cor];
+}
+function gizTraco(x, pts, cor, sem){
+  const c = CORES_GIZ[cor] || CORES_GIZ[0];
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  x.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},.09)`; x.lineWidth = 13; caminhoGiz(x, pts, sem, .8); x.stroke();
+  x.strokeStyle = padraoGiz(x, cor); x.lineWidth = 7.4; caminhoGiz(x, pts, sem + 3, .55); x.stroke();
+  x.globalAlpha = .55; x.lineWidth = 4.2; caminhoGiz(x, pts, sem + 9, .7); x.stroke(); x.globalAlpha = 1;
+}
+// a sujeira do asfalto: rachadura, mancha de óleo, faixa velha apagada, bueiro, giz velho e flor seca de ipê
+function decora(x, t){
+  const r = sorteio(t * 7919 + (CENA ? CENA.sem : 1) * 31 + 11), y0 = t * TH;
+  if(r() < .5){
+    let px = 20 + r() * 380, py = y0 + r() * TH; x.strokeStyle = 'rgba(8,8,10,.7)'; x.lineWidth = 1.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(px, py);
+    for(let k = 0; k < 9; k++){ px += (r() - .5) * 26; py += 4 + r() * 14; x.lineTo(px, py); } x.stroke();
+    x.strokeStyle = 'rgba(255,255,255,.04)'; x.lineWidth = 1; x.stroke();
+  }
+  if(r() < .3){ const px = 40 + r() * 340, py = y0 + r() * TH, g = x.createRadialGradient(px, py, 2, px, py, 26 + r() * 20); g.addColorStop(0, 'rgba(5,5,8,.5)'); g.addColorStop(1, 'rgba(5,5,8,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(px, py, 44, 26, r() * 3, 0, 7); x.fill(); }
+  if(r() < .4){ const px = 150 + r() * 120, py = y0 + r() * TH; x.fillStyle = `rgba(255,201,60,${.05 + r() * .06})`; x.save(); x.translate(px, py); x.rotate((r() - .5) * .3); x.fillRect(-4, 0, 8, 50 + r() * 40); x.restore(); }
+  if(r() < .07){
+    const px = 60 + r() * 300, py = y0 + r() * TH; x.fillStyle = '#121116'; x.beginPath(); x.arc(px, py, 17, 0, 7); x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.1)'; x.lineWidth = 1.4; x.stroke(); x.save(); x.beginPath(); x.arc(px, py, 14, 0, 7); x.clip();
+    x.strokeStyle = 'rgba(255,255,255,.07)'; for(let k = -14; k <= 14; k += 4){ x.beginPath(); x.moveTo(px - 15, py + k); x.lineTo(px + 15, py + k); x.stroke(); } x.restore();
+  }
+  if(r() < .18){
+    // giz velho de outra brincadeira, quase apagado
+    const px = 70 + r() * 280, py = y0 + 30 + r() * (TH - 60), tipo = r() * 4 | 0, cor = CORES_GIZ[r() * 4 | 0];
+    x.save(); x.translate(px, py); x.rotate((r() - .5) * .5); x.strokeStyle = `rgba(${cor},.1)`; x.fillStyle = `rgba(${cor},.1)`; x.lineWidth = 3; x.lineCap = 'round';
+    if(tipo === 0){ for(let k = 0; k < 3; k++) x.strokeRect(-14, -40 + k * 26, 28, 26); x.strokeRect(-28, 38, 28, 26); x.strokeRect(0, 38, 28, 26); }
+    else if(tipo === 1){ x.beginPath(); x.moveTo(0, 12); x.bezierCurveTo(-26, -6, -12, -26, 0, -12); x.bezierCurveTo(12, -26, 26, -6, 0, 12); x.stroke(); }
+    else if(tipo === 2){ x.font = '28px ' + F_GIZ; x.fillText(['VALEU', 'ZÉ', 'BIA', 'DUVIDO', 'FUI'][r() * 5 | 0], -30, 8); }
+    else { x.beginPath(); x.moveTo(-12, -12); x.lineTo(12, 12); x.moveTo(12, -12); x.lineTo(-12, 12); x.stroke(); }
+    x.restore();
+  }
+  const nf = r() < .5 ? 0 : 1 + (r() * 3 | 0);
+  for(let k = 0; k < nf; k++){ const px = 10 + r() * 400, py = y0 + r() * TH, rosa = r() < .4; x.fillStyle = rosa ? 'rgba(232,110,170,.45)' : 'rgba(240,190,50,.42)'; x.beginPath(); x.ellipse(px, py, 2.6, 1.6, r() * 3, 0, 7); x.fill(); }
+}
+// as faixas amarelas da beira (o barranco tá logo depois)
+function faixas(x, t){
+  const y0 = t * TH, r = sorteio(t * 13 + 5);
+  for(const bx of [4, LARG - 4]){
+    for(let y = y0; y < y0 + TH; y += 8){ const a = r() < .08 ? .1 : .55 + r() * .3; x.fillStyle = `rgba(255,201,60,${a})`; x.fillRect(bx - 1.8, y, 3.6, 8.5); }
+  }
+}
+// a tábua da largada: madeira de verdade em cima de dois tijolos
+function tabua(x){
+  const L = LARGADA, ax = L[2], ay = L[3], bx = L[4], by = L[5], dx = bx - ax, dy = by - ay, l = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+  x.save();
+  // os tijolos embaixo da ponta de cima
+  x.fillStyle = '#9C3F2A'; x.strokeStyle = '#4A1C12'; x.lineWidth = 1.2;
+  for(let k = 0; k < 3; k++){ x.fillRect(2 + (k % 2) * 6, ay + 4 + k * 9, 22, 9); x.strokeRect(2 + (k % 2) * 6, ay + 4 + k * 9, 22, 9); }
+  x.translate(ax, ay); x.rotate(ang);
+  x.fillStyle = 'rgba(0,0,0,.35)'; x.fillRect(2, 4, l, 9);
+  x.fillStyle = '#B9733A'; x.fillRect(0, -1, l + 4, 9); x.strokeStyle = '#5A3218'; x.lineWidth = 1.6; x.strokeRect(0, -1, l + 4, 9);
+  x.strokeStyle = 'rgba(90,50,24,.55)'; x.lineWidth = 1; for(let k = 0; k < 3; k++){ x.beginPath(); x.moveTo(6, 1.5 + k * 2.5); x.bezierCurveTo(l * .3, k * 2.5 + 3, l * .6, k * 2.5, l, 2 + k * 2.4); x.stroke(); }
+  x.fillStyle = '#E8D9B0'; x.fillRect(0, -1.5, l + 4, 1.8);
+  x.fillStyle = '#2A2830'; [14, l - 10].forEach(p => { x.beginPath(); x.arc(p, 3.5, 1.3, 0, 7); x.fill(); });
+  x.restore();
+  // o batente de trás
+  x.fillStyle = '#8E552A'; x.fillRect(L[0] - 2, L[1], 5, L[3] - L[1] + 2); x.strokeStyle = '#4A2A14'; x.lineWidth = 1.2; x.strokeRect(L[0] - 2, L[1], 5, L[3] - L[1] + 2);
+  // LARGADA escrito a giz embaixo da tábua (em cima fica o relógio)
+  x.save(); x.translate(38, 146); x.rotate(ang); x.fillStyle = 'rgba(243,238,226,.8)'; x.font = '17px ' + F_GIZ; x.fillText('LARGADA', 0, 0); x.restore();
+}
+// a faixa quadriculada no chão da chegada (a bandeira em si é desenhada a cada quadro, balançando)
+function chegadaChao(x){
+  const c = CENA && CENA.F.chegada; if(!c) return;
+  x.save(); x.translate(c.x, c.y);
+  for(let i = -5; i < 5; i++) for(let j = 0; j < 2; j++){ x.fillStyle = (i + j) % 2 ? 'rgba(243,238,226,.85)' : 'rgba(20,20,24,.9)'; x.fillRect(i * 4.4, 3 + j * 4.4, 4.4, 4.4); }
+  x.fillStyle = 'rgba(243,238,226,.86)'; x.font = '15px ' + F_GIZ; x.textAlign = 'center'; x.fillText('CHEGADA', 0, 28);
+  x.restore();
+}
+
+/* ---------- o fora da coluna (no computador): o barranco, escuro, com a beirada do asfalto esfarelando ---------- */
+const hashI = n => { n = Math.imul(n ^ 0x9E3779B9, 0x85EBCA6B); n ^= n >>> 13; n = Math.imul(n, 0xC2B2AE35); return (n ^ n >>> 16) >>> 0; };
+function desenhaFora(camY){
+  if(COLX <= 0) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#08070B'; ctx.fillRect(0, 0, COLX, SH); ctx.fillRect(COLX + COLW, 0, SW - COLX - COLW, SH);
+  for(const [x0, dir] of [[COLX, -1], [COLX + COLW, 1]]){
+    // a terra roxa que aparece embaixo do asfalto, sumindo no escuro
+    const g = ctx.createLinearGradient(x0, 0, x0 + dir * 120, 0); g.addColorStop(0, 'rgba(74,32,24,.5)'); g.addColorStop(.35, 'rgba(46,20,18,.28)'); g.addColorStop(1, 'rgba(20,10,10,0)');
+    ctx.fillStyle = g; ctx.fillRect(Math.min(x0, x0 + dir * 120), 0, 120, SH);
+    // os pedaços de asfalto quebrado e as pedrinhas, presos no mundo (andam junto com a ladeira)
+    const passo = 16, y0 = Math.floor((camY - 30) / passo) * passo;
+    for(let y = y0; y < camY + VH + 30; y += passo){
+      const h = hashI(y * 3 + (dir > 0 ? 7 : 0)), sy = (y - camY) * K, w1 = 3 + h % 11, w2 = 2 + (h >>> 5) % 9, alt = passo * K * (.75 + ((h >>> 9) % 6) / 10);
+      const tom = 26 + (h >>> 12) % 12;
+      ctx.fillStyle = `rgb(${tom + 2},${tom},${tom + 5})`;
+      ctx.beginPath(); ctx.moveTo(x0, sy); ctx.lineTo(x0 + dir * w1, sy + alt * .2); ctx.lineTo(x0 + dir * w2, sy + alt * .8); ctx.lineTo(x0, sy + alt); ctx.closePath(); ctx.fill();
+      if(h % 5 === 0){ const px = x0 + dir * (18 + (h >>> 3) % 70), r = 1.5 + (h >>> 7) % 4; ctx.fillStyle = `rgba(${60 + (h >>> 4) % 30},${34 + (h >>> 6) % 16},${30},.5)`; ctx.beginPath(); ctx.ellipse(px, sy + 6, r * 1.4, r, (h % 7) / 3, 0, 7); ctx.fill(); }
+      if(h % 11 === 0){ const px = x0 + dir * (10 + (h >>> 4) % 40); ctx.strokeStyle = 'rgba(176,138,72,.35)'; ctx.lineWidth = 1; ctx.beginPath(); for(let k = 0; k < 4; k++){ ctx.moveTo(px + k * 2 * dir, sy + 10); ctx.lineTo(px + (k * 2 + (k % 2 ? 3 : -2)) * dir, sy + 2 - (h >>> k) % 4); } ctx.stroke(); }
+    }
+    // a sombra da beirada
+    const s2 = ctx.createLinearGradient(x0, 0, x0 + dir * 26, 0); s2.addColorStop(0, 'rgba(0,0,0,.55)'); s2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = s2; ctx.fillRect(Math.min(x0, x0 + dir * 26), 0, 26, SH);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/* ---------- os carimbos, a cada quadro ---------- */
+const RODA = 6.5;
+function desenhaMola(x, m, comp){
+  x.save(); x.translate(m.x, m.y);
+  x.fillStyle = '#0B0A0E'; x.beginPath(); x.roundRect ? x.roundRect(-15, 1, 30, 19, 4) : x.rect(-15, 1, 30, 19); x.fill();
+  const h = 15 * (1 - comp * .55); x.strokeStyle = '#C9CCD6'; x.lineWidth = 2.1; x.lineJoin = 'round'; x.beginPath(); x.moveTo(-9, 2.5);
+  for(let k = 1; k <= 6; k++) x.lineTo(k % 2 ? 9 : -9, 2.5 + h * k / 6); x.stroke();
+  x.fillStyle = '#3B3A44'; x.fillRect(-12, 2.5 + h, 24, 3);
+  x.fillStyle = '#FF4F9A'; x.strokeStyle = '#7A1C44'; x.lineWidth = 1.2; x.beginPath(); x.roundRect ? x.roundRect(-MOLA_L - 1, -4 + comp * 4, MOLA_L * 2 + 2, 6, 3) : x.rect(-MOLA_L - 1, -4 + comp * 4, MOLA_L * 2 + 2, 6); x.fill(); x.stroke();
+  x.fillStyle = 'rgba(255,255,255,.45)'; x.fillRect(-MOLA_L + 3, -3 + comp * 4, MOLA_L * 2 - 8, 1.4);
+  x.restore();
+}
+function desenhaTurbo(x, tb, t){
+  x.save(); x.translate(tb.x, tb.y); x.rotate(Math.atan2(tb.dy, tb.dx));
+  const pulsa = reduz ? .5 : .5 + .5 * Math.sin(t * 6);
+  x.strokeStyle = `rgba(255,201,60,${.25 + pulsa * .2})`; x.lineWidth = 2; x.setLineDash([4, 5]); x.beginPath(); x.arc(0, 0, TURBO_R - 2, 0, 7); x.stroke(); x.setLineDash([]);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  for(let k = 0; k < 3; k++){
+    const o = reduz ? 0 : ((t * 22) % 12), xx = -14 + k * 11 + o * .5, al = .45 + k * .25;
+    x.strokeStyle = `rgba(255,${150 + k * 30},${40 + k * 10},${al})`; x.lineWidth = 5; x.beginPath(); x.moveTo(xx - 5, -8); x.lineTo(xx + 3, 0); x.lineTo(xx - 5, 8); x.stroke();
+  }
+  x.restore();
+}
+// o vira-lata caramelo
+function desenhaCao(x, px, py, dir, t, bravo, fase){
+  x.save(); x.translate(px, py + CAO_R + 1); x.scale(dir, 1);
+  const anda = reduz ? 0 : Math.sin(t * 13 + fase), rabo = reduz ? 0 : Math.sin(t * 18 + fase) * .5;
+  x.strokeStyle = '#7A4416'; x.lineWidth = 2.6; x.lineCap = 'round';
+  [[-8, anda], [-4, -anda], [6, -anda], [10, anda]].forEach(([lx, a]) => { x.beginPath(); x.moveTo(lx, -9); x.lineTo(lx + a * 3, -0.5); x.stroke(); });
+  x.save(); x.translate(-12, -14); x.rotate(-.9 + rabo); x.strokeStyle = '#C8752E'; x.lineWidth = 3.2; x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(-6, -4, -5, -10); x.stroke(); x.restore();
+  x.fillStyle = '#D0833A'; x.beginPath(); x.ellipse(0, -13, 13, 6.6, 0, 0, 7); x.fill();
+  x.fillStyle = '#EDB677'; x.beginPath(); x.ellipse(1, -10.5, 8, 3, 0, 0, 7); x.fill();
+  x.fillStyle = '#D0833A'; x.beginPath(); x.ellipse(13, -19, 6.6, 6, 0, 0, 7); x.fill();
+  x.fillStyle = '#EDB677'; x.beginPath(); x.ellipse(18.5, -17, 4.2, 3, 0, 0, 7); x.fill();
+  x.fillStyle = '#1B1416'; x.beginPath(); x.arc(22.3, -18, 1.6, 0, 7); x.fill(); x.beginPath(); x.arc(14.5, -21, 1.15, 0, 7); x.fill();
+  x.fillStyle = '#9A5520'; x.beginPath(); x.ellipse(9.5, -21, 2.8, 5.2, .5 + (bravo ? -.5 : 0), 0, 7); x.fill();
+  if(bravo){ x.strokeStyle = '#1B1416'; x.lineWidth = 1.4; x.beginPath(); x.moveTo(17, -14.5); x.lineTo(22, -15.5); x.stroke(); }
+  x.restore();
+}
+function desenhaBandeira(x, c, t){
+  chegadaChao(x);
+  x.save(); x.translate(c.x, c.y);
+  x.strokeStyle = '#B7B9C2'; x.lineWidth = 2.6; x.beginPath(); x.moveTo(-16, 1); x.lineTo(-16, -94); x.stroke();
+  x.fillStyle = '#FFC93C'; x.beginPath(); x.arc(-16, -95, 2.8, 0, 7); x.fill();
+  const W = 36, H = 22, nx = 6, ny = 4;
+  for(let i = 0; i < nx; i++) for(let j = 0; j < ny; j++){
+    const u0 = i / nx, u1 = (i + 1) / nx, onda = a => reduz ? 0 : Math.sin(t * 5 - a * 4) * a * 4;
+    x.fillStyle = (i + j) % 2 ? '#F3EEE2' : '#141218';
+    x.beginPath(); x.moveTo(-16 + u0 * W, -92 + j * H / ny + onda(u0)); x.lineTo(-16 + u1 * W, -92 + j * H / ny + onda(u1)); x.lineTo(-16 + u1 * W, -92 + (j + 1) * H / ny + onda(u1)); x.lineTo(-16 + u0 * W, -92 + (j + 1) * H / ny + onda(u0)); x.closePath(); x.fill();
+  }
+  x.restore();
+}
+
+/* ---------- o carrinho de rolimã e o piloto de balde ---------- */
+const CAMISAS = ['#FF7A2F', '#4AA8FF', '#FF4F9A', '#FFC93C', '#B07CFF', '#F3EEE2'];
+function rolima(x, cx, giro){
+  x.fillStyle = '#AEB2BD'; x.beginPath(); x.arc(cx, 0, RODA, 0, 7); x.fill();
+  x.strokeStyle = '#4A4D57'; x.lineWidth = 1.3; x.stroke();
+  x.fillStyle = '#5E616C'; x.beginPath(); x.arc(cx, 0, 3.7, 0, 7); x.fill();
+  x.fillStyle = '#E2E4EA'; for(let k = 0; k < 7; k++){ const a = giro + k * .8976; x.beginPath(); x.arc(cx + Math.cos(a) * 5.05, Math.sin(a) * 5.05, 1.05, 0, 7); x.fill(); }
+  x.fillStyle = '#17161B'; x.beginPath(); x.arc(cx, 0, 1.5, 0, 7); x.fill();
+  x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 1; x.beginPath(); x.arc(cx, 0, RODA - 1.2, 3.6, 4.6); x.stroke();
+}
+// pose: 0 sentado, 1 encolhido (cambalhota), 2 braço pra cima (voando)
+function desenhaCarro(x, p, lado, giro, pose, cam, alpha){
+  const mx = (p[0] + p[2]) / 2, my = (p[1] + p[3]) / 2, ang = Math.atan2(p[3] - p[1], p[2] - p[0]);
+  x.save(); x.globalAlpha = alpha; x.translate(mx, my); x.rotate(ang); x.scale(lado, 1);
+  // a sombra no chão
+  x.fillStyle = 'rgba(0,0,0,.25)'; x.beginPath(); x.ellipse(0, 7, 22, 2.5, 0, 0, 7); x.fill();
+  // os eixos e a tábua
+  x.fillStyle = '#5A3218'; x.fillRect(-17.5, -7, 5, 7); x.fillRect(12.5, -7, 5, 7);
+  rolima(x, -15, giro); rolima(x, 15, giro);
+  x.fillStyle = '#C27D3E'; x.strokeStyle = '#5A3218'; x.lineWidth = 1.4;
+  x.beginPath(); x.moveTo(-23, -11.5); x.lineTo(21, -11.5); x.lineTo(24, -9); x.lineTo(21, -6.5); x.lineTo(-23, -6.5); x.closePath(); x.fill(); x.stroke();
+  x.strokeStyle = 'rgba(90,50,24,.5)'; x.lineWidth = .8; x.beginPath(); x.moveTo(-20, -9.5); x.lineTo(18, -9.2); x.stroke();
+  x.fillStyle = '#F3EEE2'; x.font = '700 5px ' + F_TXT; x.fillText('7', -19.5, -7.5);
+  // o piloto
+  const camisa = CAMISAS[cam % CAMISAS.length];
+  const enc = pose === 1;
+  const hip = [-5, -12.5], ombro = enc ? [0, -18] : [-2.5, -20.5], cab = enc ? [3.5, -22.5] : [0, -25.5];
+  const joelho = enc ? [5, -21] : [6, -18.5], pe = enc ? [5.5, -13] : [14, -12.5];
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  x.strokeStyle = '#2E4A7A'; x.lineWidth = 4.4; x.beginPath(); x.moveTo(hip[0], hip[1]); x.lineTo(joelho[0], joelho[1]); x.lineTo(pe[0], pe[1]); x.stroke();
+  x.fillStyle = '#F3EEE2'; x.beginPath(); x.ellipse(pe[0] + 1.5, pe[1] + .8, 3.2, 1.9, 0, 0, 7); x.fill();
+  x.strokeStyle = camisa; x.lineWidth = 6.2; x.beginPath(); x.moveTo(hip[0], hip[1] - 1); x.lineTo(ombro[0], ombro[1]); x.stroke();
+  // a corda da direção e o braço
+  const mao = pose === 2 ? [-1, -31] : enc ? [6, -15] : [9, -16];
+  if(pose !== 2){ x.strokeStyle = '#D9C8A0'; x.lineWidth = .9; x.beginPath(); x.moveTo(mao[0], mao[1]); x.quadraticCurveTo(15, -13, 19, -9); x.stroke(); }
+  x.strokeStyle = camisa; x.lineWidth = 3; x.beginPath(); x.moveTo(ombro[0], ombro[1] + 1); x.lineTo(enc ? 4 : 3.5, enc ? -17 : -18); x.lineTo(mao[0], mao[1]); x.stroke();
+  x.fillStyle = '#8A5A35'; x.beginPath(); x.arc(mao[0], mao[1], 1.6, 0, 7); x.fill();
+  // a cabeça e o balde
+  x.fillStyle = '#8A5A35'; x.beginPath(); x.arc(cab[0], cab[1], 4.6, 0, 7); x.fill();
+  x.fillStyle = '#1B1416'; x.beginPath(); x.arc(cab[0] + 2.4, cab[1] - .3, .95, 0, 7); x.fill();
+  x.strokeStyle = '#1B1416'; x.lineWidth = .9; x.beginPath(); x.arc(cab[0] + 2, cab[1] + 1.2, 1.6, .2, 1.6); x.stroke();
+  x.save(); x.translate(cab[0] - .5, cab[1] - 2.2); x.rotate(-.12);
+  x.fillStyle = '#E8402A'; x.strokeStyle = '#7A1A10'; x.lineWidth = 1.1;
+  x.beginPath(); x.moveTo(-6.4, 0); x.lineTo(6.4, 0); x.lineTo(4.6, -8.4); x.lineTo(-4.6, -8.4); x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = '#F3EEE2'; x.fillRect(-5.8, -3.6, 11.6, 1.6);
+  x.strokeStyle = '#C9CCD6'; x.lineWidth = .9; x.beginPath(); x.moveTo(-5.6, -.5); x.quadraticCurveTo(-1, 7, 5.6, -.5); x.stroke();
+  x.restore();
+  x.restore();
+}
+// os pedaços quando capota: a tábua, o piloto e o balde voando cada um pra um lado
+function desenhaPedaco(x, d){
+  x.save(); x.translate(d.x, d.y); x.rotate(d.a); x.globalAlpha = Math.min(1, d.vida);
+  if(d.k === 'balde'){ x.fillStyle = '#E8402A'; x.strokeStyle = '#7A1A10'; x.lineWidth = 1.1; x.beginPath(); x.moveTo(-6.4, 4); x.lineTo(6.4, 4); x.lineTo(4.6, -4.4); x.lineTo(-4.6, -4.4); x.closePath(); x.fill(); x.stroke(); x.fillStyle = '#F3EEE2'; x.fillRect(-5.8, .4, 11.6, 1.6); }
+  else if(d.k === 'piloto'){
+    x.strokeStyle = '#2E4A7A'; x.lineWidth = 4.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(0, 3); x.lineTo(7, 7); x.lineTo(10, 12); x.stroke();
+    x.strokeStyle = CAMISAS[d.cam % CAMISAS.length]; x.lineWidth = 6; x.beginPath(); x.moveTo(0, 3); x.lineTo(-2, -5); x.stroke();
+    x.lineWidth = 3; x.beginPath(); x.moveTo(-2, -4); x.lineTo(-8, -9); x.stroke(); x.beginPath(); x.moveTo(-1, -4); x.lineTo(5, -10); x.stroke();
+    x.fillStyle = '#8A5A35'; x.beginPath(); x.arc(-3, -10, 4.6, 0, 7); x.fill();
+  } else {
+    x.fillStyle = '#C27D3E'; x.strokeStyle = '#5A3218'; x.lineWidth = 1.4; x.fillRect(-23, -3, 46, 5); x.strokeRect(-23, -3, 46, 5);
+    x.translate(0, 6); rolima(x, -15, d.a * 3); rolima(x, 15, d.a * 3);
+  }
+  x.restore();
+}
+
+/* ---------- as partículas: poeira de giz, confete, os textos que sobem ---------- */
+const parts = [], pedacos = [];
+function poeira(px, py, n, forca, cor){
+  if(reduz) n = Math.ceil(n / 3);
+  for(let i = 0; i < n; i++){ const a = -Math.PI / 2 + (Math.random() - .5) * 2.4; parts.push({ k: 'p', x: px + (Math.random() - .5) * 10, y: py, vx: Math.cos(a) * forca * (.4 + Math.random()), vy: Math.sin(a) * forca * (.3 + Math.random() * .7), r: 1.2 + Math.random() * 2.4, vida: .5 + Math.random() * .5, v0: 1, c: cor || '243,238,226' }); }
+}
+const CORES_CONFETE = ['#FFC93C', '#FF4F9A', '#4AA8FF', '#FF7A2F', '#F3EEE2', '#B07CFF'];
+function confete(px, py, n){
+  if(reduz) n = Math.min(n, 18);
+  for(let i = 0; i < n; i++){ const a = -Math.PI / 2 + (Math.random() - .5) * 2.2, v = 180 + Math.random() * 380; parts.push({ k: 'c', x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a: Math.random() * 6, va: (Math.random() - .5) * 18, w: 3 + Math.random() * 3, h: 5 + Math.random() * 4, c: CORES_CONFETE[i % CORES_CONFETE.length], vida: 2.2 + Math.random() * 1.2 }); }
+}
+function textoSobe(px, py, txt, cor){ parts.push({ k: 't', x: px, y: py, vy: -60, txt, c: cor || '#FFC93C', vida: 1.3 }); }
+function passoParticulas(dt){
+  for(let i = parts.length - 1; i >= 0; i--){
+    const q = parts[i]; q.vida -= dt;
+    if(q.vida <= 0){ parts.splice(i, 1); continue; }
+    if(q.k === 'p'){ q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 160 * dt; q.vx *= 1 - dt * 3; }
+    else if(q.k === 'c'){ q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 520 * dt; q.vx *= 1 - dt * 1.6; q.vy *= 1 - dt * 1.2; q.a += q.va * dt; q.x += Math.sin(q.vida * 9 + q.a) * 20 * dt; }
+    else if(q.k === 't'){ q.y += q.vy * dt; q.vy *= 1 - dt * 2; }
+  }
+  if(parts.length > 500) parts.splice(0, parts.length - 500);
+  for(const d of pedacos){
+    d.vy += G * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.a += d.va * dt; d.vida -= dt * .25;
+    if(CENA && d.y < CENA.F.yFundo + 400){
+      const P = [d.x, d.y]; if(empurra(CENA.F, P, 0, d.r)){ const nx = CN[0], ny = CN[1], vn = d.vx * nx + d.vy * ny; if(vn < 0){ d.vx -= nx * vn * 1.4; d.vy -= ny * vn * 1.4; d.vx *= .82; d.vy *= .82; d.va *= .7; } d.x = P[0]; d.y = P[1]; }
+    }
+  }
+}
+// a poeira vai atrás do carrinho; confete, texto e os pedaços vão na frente
+function desenhaPoeira(x){
+  for(const q of parts) if(q.k === 'p'){ x.fillStyle = `rgba(${q.c},${Math.min(.6, q.vida)})`; x.beginPath(); x.arc(q.x, q.y, q.r, 0, 7); x.fill(); }
+}
+function desenhaParticulas(x){
+  for(const q of parts){
+    if(q.k === 'c'){ x.save(); x.translate(q.x, q.y); x.rotate(q.a); x.globalAlpha = Math.min(1, q.vida); x.fillStyle = q.c; x.fillRect(-q.w / 2, -q.h / 2, q.w, q.h * Math.abs(Math.cos(q.a * 1.7))); x.restore(); }
+  }
+  x.textAlign = 'center';
+  for(const q of parts){
+    if(q.k !== 't') continue;
+    x.globalAlpha = Math.min(1, q.vida * 1.5); x.font = '15px ' + F_TIT;
+    x.lineWidth = 4; x.strokeStyle = 'rgba(0,0,0,.8)'; x.strokeText(q.txt, q.x, q.y); x.fillStyle = q.c; x.fillText(q.txt, q.x, q.y); x.globalAlpha = 1;
+  }
+  x.textAlign = 'left';
+  for(const d of pedacos) desenhaPedaco(x, d);
+}
+
+/* ---------- o som: tudo sintetizado na hora ---------- */
+let ac = null, mestre = null, ruidoB = null, ronco = null, gizSom = null, somOn = le('som') !== '0';
+function audio(){
+  if(ac){ if(ac.state === 'suspended') ac.resume().catch(() => {}); return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+  try{ ac = new AC(); }catch(e){ ac = null; return; }
+  mestre = ac.createGain(); mestre.gain.value = somOn ? .9 : 0;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 5;
+  mestre.connect(comp); comp.connect(ac.destination);
+  const n = ac.sampleRate * 2; ruidoB = ac.createBuffer(1, n, ac.sampleRate); const d = ruidoB.getChannelData(0); for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  // o ronco do rolimã: ruído com o tom pela velocidade, as bolinhas batendo (a modulação) e um grave
+  ronco = { g: ac.createGain(), f: ac.createBiquadFilter(), s: ac.createBufferSource(), am: ac.createGain(), lfo: ac.createOscillator(), lg: ac.createGain(), o: ac.createOscillator(), og: ac.createGain() };
+  ronco.s.buffer = ruidoB; ronco.s.loop = true; ronco.f.type = 'bandpass'; ronco.f.frequency.value = 400; ronco.f.Q.value = 1.3;
+  ronco.s.connect(ronco.f); ronco.f.connect(ronco.am); ronco.am.connect(ronco.g); ronco.g.connect(mestre); ronco.g.gain.value = 0; ronco.am.gain.value = .65;
+  ronco.lfo.type = 'square'; ronco.lfo.frequency.value = 20; ronco.lg.gain.value = .35; ronco.lfo.connect(ronco.lg); ronco.lg.connect(ronco.am.gain);
+  ronco.o.type = 'triangle'; ronco.o.frequency.value = 55; ronco.o.connect(ronco.og); ronco.og.connect(mestre); ronco.og.gain.value = 0;
+  ronco.s.start(); ronco.lfo.start(); ronco.o.start();
+  // o giz riscando o asfalto
+  gizSom = { g: ac.createGain(), h: ac.createBiquadFilter(), f: ac.createBiquadFilter(), s: ac.createBufferSource() };
+  gizSom.s.buffer = ruidoB; gizSom.s.loop = true; gizSom.h.type = 'highpass'; gizSom.h.frequency.value = 1300; gizSom.f.type = 'peaking'; gizSom.f.frequency.value = 3400; gizSom.f.gain.value = 9;
+  gizSom.s.connect(gizSom.h); gizSom.h.connect(gizSom.f); gizSom.f.connect(gizSom.g); gizSom.g.connect(mestre); gizSom.g.gain.value = 0; gizSom.s.start();
+}
+function poeSom(on, inicial){
+  somOn = on; if(!inicial) guarda('som', on ? '1' : '0');
+  document.querySelectorAll('.bt-som').forEach(b => { b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', on ? 'Som ligado' : 'Som desligado'); });
+  // o som só nasce no primeiro toque (antes disso o navegador nem deixa)
+  if(inicial) return;
+  audio(); if(mestre) mestre.gain.setTargetAtTime(on ? .9 : 0, ac.currentTime, .05);
+}
+function atualizaRonco(vel, noChao, giz){
+  if(!ac) return;
+  const t = ac.currentTime, s = clamp(vel / VMAX, 0, 1), anda = noChao && vel > 6;
+  ronco.g.gain.setTargetAtTime(anda ? .05 + s * .2 : 0, t, anda ? .05 : .03);
+  ronco.f.frequency.setTargetAtTime(240 + s * 1250, t, .06);
+  ronco.lfo.frequency.setTargetAtTime(7 + s * 62, t, .06);
+  ronco.og.gain.setTargetAtTime(anda ? s * .09 : 0, t, .06); ronco.o.frequency.setTargetAtTime(46 + s * 80, t, .06);
+  gizSom.g.gain.setTargetAtTime(clamp(giz, 0, 1) * .16, t, .03);
+}
+const gan = (o = mestre) => { const g = ac.createGain(); g.connect(o); return g; };
+const env = (g, t, a, v, d) => { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(.0002, v), t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); };
+const osc = (tipo, f, t, dur, o) => { const s = ac.createOscillator(); s.type = tipo; s.frequency.setValueAtTime(f, t); s.connect(o); s.start(t); s.stop(t + dur + .05); return s; };
+const ruid = (t, dur, o) => { const s = ac.createBufferSource(); s.buffer = ruidoB; s.connect(o); s.start(t, Math.random() * 1.5); s.stop(t + dur + .05); return s; };
+const filt = (tipo, f, q, o) => { const b = ac.createBiquadFilter(); b.type = tipo; b.frequency.value = f; b.Q.value = q; b.connect(o); return b; };
+const SFX = {
+  pulo(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .22, .15); const s = osc('square', 200, t, .2, filt('lowpass', 1700, 1, g)); s.frequency.exponentialRampToValueAtTime(600, t + .11); const g2 = gan(); env(g2, t, .003, .12, .1); ruid(t, .12, filt('bandpass', 2600, 1, g2)); },
+  pouso(f){ const t = ac.currentTime, v = clamp(f / 600, .18, 1); const g = gan(); env(g, t, .003, .32 * v, .17); osc('sine', 125, t, .2, g).frequency.exponentialRampToValueAtTime(46, t + .15); const g2 = gan(); env(g2, t, .002, .16 * v, .11); ruid(t, .13, filt('lowpass', 950, .8, g2));
+    for(let i = 0; i < 3; i++){ const g3 = gan(); env(g3, t + .025 + i * .03, .001, .045 * v, .04); osc('triangle', 2300 + Math.random() * 1900, t + .025 + i * .03, .05, g3); } },
+  mola(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .3, .5); const s = osc('sine', 150, t, .55, g); s.frequency.exponentialRampToValueAtTime(560, t + .15); s.frequency.exponentialRampToValueAtTime(290, t + .5);
+    const l = ac.createOscillator(); l.frequency.value = 17; const lg = ac.createGain(); lg.gain.value = 45; l.connect(lg); lg.connect(s.frequency); l.start(t); l.stop(t + .55);
+    const g2 = gan(); env(g2, t, .003, .1, .3); osc('triangle', 330, t, .35, g2).frequency.exponentialRampToValueAtTime(1150, t + .2); },
+  turbo(){ const t = ac.currentTime; const g = gan(); env(g, t, .02, .2, .45); osc('sawtooth', 110, t, .5, filt('lowpass', 1700, 3, g)).frequency.exponentialRampToValueAtTime(460, t + .4);
+    const g2 = gan(); env(g2, t, .05, .2, .4); const f = filt('bandpass', 800, 1.2, g2); ruid(t, .5, f); f.frequency.exponentialRampToValueAtTime(5200, t + .4); },
+  latido(){ const t = ac.currentTime; [0, .19].forEach((d, i) => { const tt = t + d; const g = gan(); env(g, tt, .006, .3, .11); osc('sawtooth', 470 - i * 35, tt, .14, filt('bandpass', 1150 + i * 130, 2.2, g)).frequency.exponentialRampToValueAtTime(250, tt + .12); const g2 = gan(); env(g2, tt, .002, .13, .06); ruid(tt, .07, filt('bandpass', 1700, 1.4, g2)); }); },
+  capotou(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .5, .5); const f = filt('lowpass', 1700, .9, g); ruid(t, .55, f); f.frequency.exponentialRampToValueAtTime(220, t + .5);
+    const g2 = gan(); env(g2, t, .003, .42, .3); osc('sine', 112, t, .35, g2).frequency.exponentialRampToValueAtTime(38, t + .3);
+    [523, 1187, 1712, 2390].forEach((fr, i) => { const g3 = gan(); env(g3, t + .07, .002, .16 / (i + 1), .55 - i * .09); osc('sine', fr, t + .07, .65, g3); }); },
+  chegada(){ const t = ac.currentTime;
+    [523, 659, 784, 1047].forEach((f, i) => { const fim = i === 3, d = fim ? .8 : .16; const g = gan(); env(g, t + i * .09, .006, .17, d); osc('square', f, t + i * .09, d + .05, filt('lowpass', 2600, 1, g)); const g2 = gan(); env(g2, t + i * .09, .006, .09, d); osc('sawtooth', f / 2, t + i * .09, d + .05, filt('lowpass', 1300, 1, g2)); });
+    [659, 784, 1047].forEach(f => { const g = gan(); env(g, t + .36, .02, .07, .9); osc('triangle', f, t + .36, 1, g); });
+    const g4 = gan(); env(g4, t + .3, .25, .05, 1.2); ruid(t + .3, 1.5, filt('bandpass', 1400, .5, g4)); },
+  cambalhota(n){ const t = ac.currentTime; for(let i = 0; i < 3 + n; i++){ const g = gan(); env(g, t + i * .055, .003, .12, .22); osc('triangle', 880 * Math.pow(1.26, i), t + i * .055, .26, g); } },
+  clique(){ const t = ac.currentTime; const g = gan(); env(g, t, .001, .08, .04); osc('square', 1500, t, .05, filt('bandpass', 1900, 3, g)); },
+  carimbo(){ const t = ac.currentTime; const g = gan(); env(g, t, .002, .32, .14); osc('sine', 150, t, .16, g).frequency.exponentialRampToValueAtTime(60, t + .12); const g2 = gan(); env(g2, t, .001, .11, .05); ruid(t, .06, filt('lowpass', 2100, 1, g2)); },
+  apaga(){ const t = ac.currentTime; const g = gan(); env(g, t, .02, .1, .18); ruid(t, .22, filt('bandpass', 950, .7, g)); },
+  desfaz(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .11, .14); osc('triangle', 720, t, .16, g).frequency.exponentialRampToValueAtTime(340, t + .12); },
+  copia(){ const t = ac.currentTime; [784, 1175, 1568].forEach((f, i) => { const g = gan(); env(g, t + i * .07, .004, .12, .2); osc('triangle', f, t + i * .07, .22, g); }); },
+  vai(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .16, .22); osc('square', 988, t, .26, filt('lowpass', 2400, 1, g)); },
+  erro(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .14, .2); osc('square', 140, t, .24, filt('lowpass', 900, 1, g)); },
+  recorde(){ const t = ac.currentTime; [1047, 1319, 1568, 2093].forEach((f, i) => { const g = gan(); env(g, t + .5 + i * .07, .004, .1, .3); osc('triangle', f, t + .5 + i * .07, .32, g); }); }
+};
+const SONS = [];   // os últimos sons pedidos (pros testes)
+const som = (k, v) => { SONS.push(k); if(SONS.length > 60) SONS.shift(); if(ac && somOn && SFX[k]) try{ SFX[k](v); }catch(e){} };
+
+
+/* ======================= a página: telas, descida, editor ======================= */
+const TINTA_MAX = 4200;                    // o giz do editor: segura o tamanho da ladeira e do link
+const LIM = { mola: 8, turbo: 8, cachorro: 8, chegada: 1 };
+let tela = 'inicio', JOGO = null, DEMO = null, DESAFIO = null, camY = -40, TEMPO = 0, tremor = 0, acc = 0, alfa = 0;
+const fila = [];
+let nome = limpaNome(le('nome') || '');
+const recs = leJSON('recs', {}), fants = leJSON('fant', {});
+const casaCache = {};
+
+function limpaNome(s){ return String(s || '').replace(/[^\x20-\x7E -ÿ]/g, '').replace(/\s+/g, ' ').trim().slice(0, NOME_MAX); }
+const corDe = s => { let h = 7; for(const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) % 9973; return h; };
+function tempoCasa(i){
+  if(casaCache[i]) return casaCache[i];
+  const p = PRONTAS[i], F = compila(p.fase); let best = null;
+  for(const antes of [.28, .32, .36, .4]){ const x = desceRobo(F, { antes }); if(x.r.chegou && (!best || x.r.cs < best.cs)) best = { cs: x.r.cs, ev: x.ev }; }
+  return (casaCache[i] = best);
+}
+let DIA = null;
+function doDia(){ const d = diaHoje(); if(!DIA || DIA.dia.d !== d.d || DIA.dia.m !== d.m || DIA.dia.a !== d.a) DIA = ladeiraDoDia(d); return DIA; }
+const dd = n => String(n).padStart(2, '0');
+
+/* ---------- os cartões e os avisos ---------- */
+const CARTOES = ['inicio', 'desafio', 'cola', 'nome', 'fim', 'manda'];
+let usouTeclado = false;
+addEventListener('keydown', e => { if(e.key === 'Tab') usouTeclado = true; }, true);
+function soCartao(id, foco){
+  CARTOES.forEach(c => { $(c).hidden = c !== id; });
+  $('veu').hidden = !id;
+  if(id){ const el = $(id); el.scrollTop = 0; const f = foco ? $(foco) : el.querySelector('.bt-vai, .bt-rosa'); if(f && (foco ? !dedoTela : usouTeclado)) setTimeout(() => { try{ f.focus({ preventScroll: true }); }catch(e){} }, 30); }
+}
+let avisoT = 0;
+function aviso(txt, seg){ const a = $('aviso'); a.textContent = txt; a.hidden = false; avisoT = seg || 2.6; }
+function carimbo(txt, sub, tipo, seg){
+  const c = $('carimbo'); $('carT').textContent = txt; $('carS').textContent = sub || ''; $('carS').hidden = !sub;
+  c.className = 'carimbo ' + (tipo || ''); void c.offsetWidth; c.classList.add('bate'); c.hidden = false; carimboT = seg || 0;
+}
+let carimboT = 0;
+function mostraUI(){
+  const jogando = tela === 'jogo', editando = tela === 'editor';
+  $('hud').hidden = !jogando; app.classList.toggle('editando', editando);
+  ['edTopo', 'edFerr'].forEach(id => $(id).hidden = !editando);
+  $('cores').hidden = !editando || ED.ferr !== 'lapis';
+  if(!editando){ $('edDica').hidden = true; $('apagaTudo').hidden = true; }
+  if(!jogando){ $('carimbo').hidden = true; $('pos').hidden = true; $('dicaJogo').hidden = true; }
+}
+
+/* ---------- a entrada ---------- */
+function miniatura(c, fase){
+  const x = c.getContext('2d'), W = c.width, H = c.height, F = compila(fase);
+  const alt = Math.max(F.yMax + 30, 400), s = Math.min(W / LARG, H / (alt + 20)), ox = (W - LARG * s) / 2;
+  x.fillStyle = '#121116'; x.fillRect(0, 0, W, H);
+  x.save(); x.translate(ox, 6); x.scale(s, s);
+  x.strokeStyle = 'rgba(255,201,60,.35)'; x.lineWidth = 1 / s; x.strokeRect(0, 0, LARG, alt);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  x.strokeStyle = '#B9733A'; x.lineWidth = 7; x.beginPath(); x.moveTo(LARGADA[2], LARGADA[3]); x.lineTo(LARGADA[4], LARGADA[5]); x.stroke();
+  for(const t of fase.tracos){ const c2 = CORES_GIZ[t.cor] || CORES_GIZ[0]; x.strokeStyle = `rgb(${c2})`; x.lineWidth = Math.max(5, 1.6 / s); x.beginPath(); for(let i = 0; i < t.pts.length; i += 2) i ? x.lineTo(t.pts[i], t.pts[i + 1]) : x.moveTo(t.pts[0], t.pts[1]); x.stroke(); }
+  for(const cb of fase.carimbos){
+    x.fillStyle = { mola: '#FF4F9A', turbo: '#FFC93C', cachorro: '#D0833A', chegada: '#F3EEE2' }[cb.tipo];
+    x.beginPath(); x.arc(cb.x, cb.y - (cb.tipo === 'chegada' ? 20 : 8), cb.tipo === 'chegada' ? 16 : 12, 0, 7); x.fill();
+  }
+  x.restore();
+}
+function montaLista(){
+  const L = $('iFases'); L.innerHTML = '';
+  const dia = doDia(), linhas = [{ tipo: 'dia', fase: dia, nome: 'Ladeira do dia', sub: 'Muda à meia-noite, igual pra todo mundo · ' + dd(dia.dia.d) + '/' + dd(dia.dia.m), casa: dia.par ? { cs: dia.par } : null }];
+  PRONTAS.forEach((p, i) => linhas.push({ tipo: 'pronta', i, fase: p.fase, nome: (i + 1) + '. ' + p.nome, sub: p.sub, casa: null }));
+  for(const l of linhas){
+    const b = document.createElement('button'); b.className = 'fase' + (l.tipo === 'dia' ? ' dia' : '');
+    const c = document.createElement('canvas'); c.width = 96; c.height = 120; c.setAttribute('aria-hidden', 'true');
+    const id = idFase(l.fase), r = recs[id];
+    b.innerHTML = `<span class="txt"><b></b><small></small></span><em></em>`;
+    b.prepend(c);
+    b.querySelector('b').textContent = l.nome; b.querySelector('small').textContent = l.sub;
+    b.querySelector('em').innerHTML = r !== undefined ? `${fmt2(r)} s<span>teu recorde</span>` : `—<span>sem tempo</span>`;
+    b.setAttribute('aria-label', l.nome + '. ' + l.sub + (r !== undefined ? '. Teu recorde: ' + fmt2(r) + ' segundos' : ''));
+    b.addEventListener('click', () => { audio(); som('clique'); jogaFase(l.fase, l.tipo, l.tipo === 'pronta' ? { i: l.i } : { dia: l.fase.dia }); });
+    L.appendChild(b); miniatura(c, l.fase);
+  }
+}
+function mostraInicio(){
+  tela = 'inicio'; JOGO = null; soltaTrava();
+  $('iQuem').hidden = !nome; $('iNome').textContent = nome;
+  montaLista(); soCartao('inicio'); mostraUI();
+  const d = doDia(); iniciaDemo(d, d.robo || null);
+}
+
+/* ---------- a demonstração atrás dos cartões (o robô descendo, ou o fantasma de quem mandou o desafio) ---------- */
+function iniciaDemo(fase, eventos){
+  const F = compila(fase); montaCena(fase, F);
+  DEMO = { F, fase, S: novoEstado(F), ev: eventos, j: 0, espera: 0, vis: novoVis(), cam: corDe(nome || 'demo') };
+  camY = -40;
+}
+function passoDemo(dt){
+  const D = DEMO; if(!D) return;
+  if(D.S.fim){ D.espera += dt; if(D.espera > 1.4){ D.S = novoEstado(D.F); D.j = 0; D.espera = 0; D.vis = novoVis(); } }
+  else {
+    acc += dt; let n = 0;
+    while(acc >= PASSO && n < 30){
+      if(D.ev){ while(D.j < D.ev.length && D.ev[D.j] <= D.S.passos){ if(D.j % 2 === 0) toca(D.S); else solta(D.S); D.j++; } }
+      else { const a = piloto(D.F, D.S); if(a === 1) toca(D.S); else if(a === 0) solta(D.S); }
+      D.S.ev.length = 0; passo(D.F, D.S); acc -= PASSO; n++;
+      if(D.S.fim) break;
+    }
+    if(n >= 30) acc = 0;
+  }
+  passoVis(D.vis, D.S, dt);
+  seguir(D.S, dt, D.S.fim ? 1 : acc / PASSO);
+}
+
+/* ---------- a descida ---------- */
+function tituloDe(origem, extra, fase){
+  if(origem === 'pronta') return PRONTAS[extra.i].nome;
+  if(origem === 'dia') return 'Ladeira do dia · ' + dd(extra.dia.d) + '/' + dd(extra.dia.m);
+  if(origem === 'teste') return 'Tua ladeira';
+  return fase.autor ? 'Ladeira de ' + fase.autor : 'Ladeira do desafio';
+}
+function jogaFase(fase, origem, extra){
+  audio();
+  const F = compila(fase);
+  JOGO = { fase, F, origem, extra: extra || {}, id: idFase(fase), S: null, G: null, gEv: null, gNome: '', ev: [], sessao: null, tentativas: 0 };
+  JOGO.titulo = tituloDe(origem, JOGO.extra, fase);
+  DEMO = null; montaCena(fase, F);
+  defineFantasma(JOGO);
+  tela = 'jogo'; soCartao(null); mostraUI();
+  comecaDescida(); pedeTrava();
+}
+// o fantasma: no desafio, quem mandou; senão, o teu melhor; senão, a casa (o robô)
+function defineFantasma(J){
+  J.gEv = null; J.gNome = '';
+  if(J.origem === 'desafio' && J.fase.fantasma && J.fase.corrente && J.fase.corrente.length){ J.gEv = J.fase.fantasma; J.gNome = J.fase.corrente[J.fase.corrente.length - 1].nome; }
+  else if(fants[J.id]){ J.gEv = fants[J.id]; J.gNome = 'teu recorde'; }
+  else if(J.origem === 'pronta'){ const c = tempoCasa(J.extra.i); if(c){ J.gEv = c.ev; J.gNome = 'a casa'; } }
+  else if(J.origem === 'dia' && J.fase.robo){ J.gEv = J.fase.robo; J.gNome = 'a casa'; }
+}
+function novoVis(){ return { giro: 0, lado: 1, pose: 0, arT: 0 }; }
+function comecaDescida(){
+  const J = JOGO;
+  J.S = novoEstado(J.F); J.ev = []; J.tentativas++;
+  J.G = J.gEv ? novoEstado(J.F) : null; J.gj = 0; J.gAlfa = .42;
+  J.vis = novoVis(); J.gVis = novoVis(); J.fimT = 0; J.podeReiniciar = false; J.mostrouFim = false; J.latiu = []; J.molaT = [];
+  fila.length = 0; acc = 0; parts.length = 0; pedacos.length = 0; tremor = 0;
+  camY = -40;
+  $('carimbo').hidden = true; $('pos').hidden = true; soCartao(null); mostraUI();
+  atualizaAlvo();
+  const primeira = !le('dica-jogo');
+  $('dicaTx').innerHTML = dedoTela ? '<b>Toca</b>: pula · <b>Segura</b> no ar: cambalhota' : '<b>Espaço</b>: pula · <b>segura</b> no ar: cambalhota · <b>R</b> recomeça';
+  $('dicaJogo').hidden = !(primeira || J.tentativas === 1);
+  if(J.tentativas === 1){ carimbo('VAI!', '', 'vai', .6); som('vai'); }
+}
+function atualizaAlvo(){
+  const J = JOGO, r = recs[J.id];
+  let h = '';
+  if(J.origem === 'desafio' && J.fase.corrente && J.fase.corrente.length){ const u = J.fase.corrente[J.fase.corrente.length - 1]; h = `<b>${esc(u.nome)}</b>: ${fmt2(u.cs)}`; }
+  else if(J.origem === 'pronta'){ const c = tempoCasa(J.extra.i); if(c) h = `casa: ${fmt2(c.cs)}`; }
+  else if(J.origem === 'dia' && J.fase.par) h = `casa: ${fmt2(J.fase.par)}`;
+  if(r !== undefined) h += (h ? ' · ' : '') + `teu: ${fmt2(r)}`;
+  $('alvo').innerHTML = h;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function apertou(){
+  if(tela !== 'jogo' || !JOGO) return;
+  audio();
+  const S = JOGO.S;
+  if(S.fim){ if(JOGO.podeReiniciar && S.fim.motivo !== 'chegou') reinicia(); return; }
+  fila.push(1);
+  if(!$('dicaJogo').hidden && S.passos > 30){ $('dicaJogo').hidden = true; guarda('dica-jogo', '1'); }
+}
+function soltou(){ if(tela === 'jogo' && JOGO && !JOGO.S.fim) fila.push(0); }
+function aplicaFila(){
+  const S = JOGO.S;
+  while(fila.length){ const k = fila.shift(); if(k === 1 && !S.segura){ toca(S); JOGO.ev.push(S.passos); } else if(k === 0 && S.segura){ solta(S); JOGO.ev.push(S.passos); } }
+}
+function passoFantasma(){
+  const J = JOGO, G = J.G; if(!G || G.fim) return;
+  while(J.gj < J.gEv.length && J.gEv[J.gj] <= G.passos){ if(J.gj % 2 === 0) toca(G); else solta(G); J.gj++; }
+  G.ev.length = 0; passo(J.F, G);
+}
+function passoJogo(dt){
+  const J = JOGO, S = J.S;
+  acc += dt; let n = 0;
+  while(acc >= PASSO && n < 30){
+    if(!S.fim){ S.ev.length = 0; if(J.agenda) while(J.agenda.length && J.agenda[0].n <= S.passos) fila.push(J.agenda.shift().k); aplicaFila(); passo(J.F, S); trataEventos(S); if(S.fim) fimDaDescida(); }
+    passoFantasma();
+    acc -= PASSO; n++;
+  }
+  if(n >= 30) acc = 0;
+  alfa = S.fim ? 1 : acc / PASSO;
+  if(S.fim){
+    J.fimT += dt;
+    if(!J.podeReiniciar && J.fimT > .32 && S.fim.motivo !== 'chegou'){ J.podeReiniciar = true; $('pos').hidden = false; }
+    if(S.fim.motivo === 'chegou' && J.fimT > 1 && !J.mostrouFim){ J.mostrouFim = true; mostraFim(); }
+  }
+  if(J.G){ if(J.G.fim && J.G.fim.motivo !== 'chegou') J.gAlfa = Math.max(0, J.gAlfa - dt * .8); passoVis(J.gVis, J.G, dt); }
+  passoVis(J.vis, S, dt);
+  // o caramelo late quando o carrinho chega perto
+  if(!S.fim) J.F.caes.forEach((c, i) => {
+    const q = posCao(c, S.passos), mx = (S.p[0] + S.p[2]) / 2, my = (S.p[1] + S.p[3]) / 2;
+    if(Math.abs(q[0] - mx) < 120 && Math.abs(q[1] - my) < 60 && TEMPO - (J.latiu[i] || -9) > 1.6){ J.latiu[i] = TEMPO; som('latido'); textoSobe(q[0] + 10, q[1] - 22, 'AU!', '#F3EEE2'); }
+  });
+  for(let i = 0; i < J.molaT.length; i++) if(J.molaT[i] > 0) J.molaT[i] -= dt;
+  // correndo no chão, o rolimã levanta pó de giz atrás
+  if(!S.fim && (S.c0 || S.c1)){ const vx = (S.v[0] + S.v[2]) / 2, vy = (S.v[1] + S.v[3]) / 2, sp = Math.sqrt(vx * vx + vy * vy); J.poT = (J.poT || 0) + dt * sp / 90; if(sp > 300 && J.poT > 1 && !reduz){ J.poT = 0; const tr = S.frente === 1 ? 0 : 2; parts.push({ k: 'p', x: S.p[tr] - S.nx * RR, y: S.p[tr + 1] - S.ny * RR, vx: -vx * .15 + (Math.random() - .5) * 30, vy: -20 - Math.random() * 30, r: 1 + Math.random() * 1.8, vida: .35 + Math.random() * .3, c: '243,238,226' }); } }
+  seguir(S, dt, alfa);
+  $('relogio').innerHTML = fmt2(tempoAtual(S)) + '<small>s</small>';
+}
+function tempoAtual(S){ if(S.fim && S.fim.cs !== null) return S.fim.cs; return Math.max(0, Math.round(S.passos * 100 / 120) - 50 * S.cambalhotas); }
+function trataEventos(S){
+  const ev = S.ev, p = S.p;
+  for(let i = 0; i < ev.length; i += 2){
+    const k = ev[i], v = ev[i + 1];
+    if(k === 'pulo'){ som('pulo'); chaoPoeira(S, 8, 90); }
+    else if(k === 'pouso'){ if(v > 130){ som('pouso', v); chaoPoeira(S, Math.min(16, v / 40 | 0), Math.min(160, v * .3)); if(v > 420) tremor = Math.max(tremor, .12); } }
+    else if(k === 'mola'){ som('mola'); JOGO.molaT[v] = .32; }
+    else if(k === 'turbo'){ som('turbo'); poeira((p[0] + p[2]) / 2, (p[1] + p[3]) / 2, 10, 160, '255,201,60'); }
+    else if(k === 'cambalhota'){ som('cambalhota', v); textoSobe((p[0] + p[2]) / 2, (p[1] + p[3]) / 2 - 46, '+' + v + (v > 1 ? ' CAMBALHOTAS' : ' CAMBALHOTA'), '#FFC93C'); textoSobe((p[0] + p[2]) / 2, (p[1] + p[3]) / 2 - 28, '−' + fmt1(v * 50) + ' s', '#F3EEE2'); }
+  }
+}
+function chaoPoeira(S, n, f){ const p = S.p, nx = S.nx, ny = S.ny; for(const i of [0, 2]) poeira(p[i] - nx * RR, p[i + 1] - ny * RR, Math.ceil(n / 2), f); }
+// o carrinho na tela: os rolimãs girando, o lado que ele olha virando devagar, a pose do piloto
+function passoVis(V, S, dt){
+  const v = S.v, p = S.p, ux = (p[2] - p[0]) / LB, uy = (p[3] - p[1]) / LB, vb = ((v[0] + v[2]) * ux + (v[1] + v[3]) * uy) / 2;
+  V.giro += vb * dt / RODA;
+  const alvo = S.frente === 1 ? 1 : -1;
+  if(reduz) V.lado = alvo; else V.lado += clamp(alvo - V.lado, -dt * 11, dt * 11);
+  const noAr = !S.c0 && !S.c1;
+  V.arT = noAr ? V.arT + dt : 0;
+  V.pose = S.fim ? 0 : noAr && S.segura && S.segT >= SEG_MIN ? 1 : V.arT > .45 ? 2 : 0;
+}
+function seguir(S, dt, a){
+  const p = S.p, pa = S.pa, my = (pa[1] + pa[3]) / 2 + ((p[1] + p[3]) / 2 - (pa[1] + pa[3]) / 2) * a, vy = (S.v[1] + S.v[3]) / 2;
+  let alvo = my - VH * .38 + clamp(vy * .22, -VH * .1, VH * .18);
+  alvo = Math.max(alvo, -40);
+  if(my - 34 < alvo + VH * .1) alvo = my - 34 - VH * .1;
+  alvo = Math.min(alvo, Math.max(-40, (CENA ? CENA.yMax + 150 - VH : 0), my - VH * .62));
+  camY += (alvo - camY) * (1 - Math.exp(-dt * 5.5));
+}
+const TITULO = { capotou: 'CAPOTOU!', torto: 'CAPOTOU!', cachorro: 'CAPOTOU!', barranco: 'BARRANCO!', caiu: 'DESPENCOU!', empacou: 'EMPACOU!', tempo: 'DEMOROU!' };
+const FRASES = {
+  capotou: ['Beijou o asfalto.', 'O balde aguentou. Tu, nem tanto.', 'Ralou até a alma.', 'Capacete de balde salvou.'],
+  torto: ['Pousou de cara no chão.', 'Pousou torto demais.', 'Faltou girar mais um tiquinho.'],
+  cachorro: ['O caramelo não deixou.', 'Cachorro do vizinho: 1. Tu: 0.', 'Ele só queria brincar.'],
+  barranco: ['Saiu da pista.', 'Foi pro mato.', 'O barranco agradece a visita.'],
+  caiu: ['Lá embaixo não tem nada.', 'Faltou chão.'],
+  empacou: ['Parou no meio do caminho.', 'Sem embalo não desce.'],
+  tempo: ['Dois minutos e nada.']
+};
+function fimDaDescida(){
+  const J = JOGO, S = J.S, m = S.fim.motivo, mx = (S.p[0] + S.p[2]) / 2, my = (S.p[1] + S.p[3]) / 2;
+  fila.length = 0; $('dicaJogo').hidden = true;
+  if(m === 'chegou'){
+    const cs = S.fim.cs, run = { cs, ev: J.ev.slice(), camb: S.cambalhotas };
+    J.ultimo = run;
+    const ant = recs[J.id]; J.recorde = ant === undefined || cs < ant; J.antes = ant;
+    if(J.recorde){ recs[J.id] = cs; guardaJSON('recs', recs); fants[J.id] = run.ev; podaFants(); }
+    if(!J.sessao || cs < J.sessao.cs) J.sessao = run;
+    if(J.origem === 'teste'){ if(ED.validado !== J.id || !ED.melhor || cs < ED.melhor.cs){ ED.melhor = run; } ED.validado = J.id; salvaRascunho(); }
+    carimbo('CHEGOU!', fmt2(cs) + ' s' + (S.cambalhotas ? ' · ' + S.cambalhotas + (S.cambalhotas > 1 ? ' cambalhotas' : ' cambalhota') : ''), 'ok');
+    som('chegada'); if(J.recorde && ant !== undefined) som('recorde');
+    confete(mx, my - 30, 140); if(!reduz) setTimeout(() => { if(JOGO === J) confete(mx, my - 80, 70); }, 260);
+  } else {
+    const fr = FRASES[m] || ['Deu ruim.'];
+    let sub = fr[(J.tentativas - 1) % fr.length];
+    if(J.origem === 'teste' && !J.F.chegada && (m === 'caiu' || m === 'empacou')) sub = 'Falta a CHEGADA: põe a bandeira no fim.';
+    carimbo(TITULO[m] || 'DEU RUIM', sub, '');
+    $('posTx').textContent = dedoTela ? 'Toca pra tentar de novo' : 'Clica ou aperta espaço pra tentar de novo';
+    $('pEditor').hidden = J.origem !== 'teste';
+    if(m === 'capotou' || m === 'torto' || m === 'cachorro'){
+      som('capotou'); tremor = .45; soltaPedacos(S);
+      try{ if(navigator.vibrate) navigator.vibrate([60, 40, 90]); }catch(e){}
+      if(m === 'cachorro') setTimeout(() => som('latido'), 120);
+    } else som('erro');
+  }
+}
+function soltaPedacos(S){
+  const p = S.p, mx = (p[0] + p[2]) / 2, my = (p[1] + p[3]) / 2, vx = (S.v[0] + S.v[2]) / 2, vy = (S.v[1] + S.v[3]) / 2;
+  const ux = (p[2] - p[0]) / LB, uy = (p[3] - p[1]) / LB, hx = mx + uy * HC, hy = my - ux * HC, lado = S.frente === 1 ? 1 : -1;
+  const ang = Math.atan2(p[3] - p[1], p[2] - p[0]);
+  pedacos.push({ k: 'tabua', x: mx, y: my, vx: vx * .6, vy: vy * .5 - 120, a: ang, va: (Math.random() - .5) * 8, r: 9, vida: 4 });
+  pedacos.push({ k: 'piloto', x: (mx + hx) / 2, y: (my + hy) / 2, vx: vx * .8 + lado * 60, vy: vy * .4 - 300, a: ang, va: lado * (6 + Math.random() * 5), r: 8, vida: 4, cam: JOGO ? corDe(nome) : 0 });
+  pedacos.push({ k: 'balde', x: hx, y: hy - 4, vx: vx * .9 - lado * 40, vy: vy * .3 - 480, a: 0, va: (Math.random() < .5 ? -1 : 1) * (12 + Math.random() * 8), r: 6, vida: 4 });
+}
+function podaFants(){ const ks = Object.keys(fants); while(ks.length > 40){ delete fants[ks.shift()]; } guardaJSON('fant', fants); }
+function reinicia(){ if(tela === 'jogo' && JOGO){ som('clique'); comecaDescida(); } }
+function saiDoJogo(){
+  if(!JOGO) return mostraInicio();
+  const J = JOGO;
+  if(J.origem === 'teste') return abreEditor();
+  if(J.origem === 'desafio') return abreDesafio(J.fase);
+  mostraInicio();
+}
+
+/* ---------- o resultado ---------- */
+function mostraFim(){
+  const J = JOGO, run = J.ultimo, cs = run.cs;
+  $('fOlho').textContent = J.titulo;
+  $('fTempo').innerHTML = fmt2(cs) + '<small>s</small>';
+  $('fT').textContent = 'Chegou em ' + fmt2(cs) + ' segundos';
+  $('fBonus').hidden = !run.camb; $('fBonus').textContent = run.camb ? `${run.camb} ${run.camb > 1 ? 'cambalhotas' : 'cambalhota'}: −${fmt2(run.camb * 50)} s no tempo` : '';
+  const cmp = $('fCompara'); cmp.className = 'compara';
+  if(J.origem === 'desafio' && J.fase.corrente && J.fase.corrente.length){
+    const u = J.fase.corrente[J.fase.corrente.length - 1], dif = u.cs - cs, eu = u.nome === nome;
+    if(eu){ cmp.innerHTML = dif > 0 ? `Bateu o teu próprio tempo por <em>${fmtDif(dif)}</em>.` : `Teu tempo no link é <em>${fmt2(u.cs)} s</em>.`; }
+    else if(dif > 0) cmp.innerHTML = `Ganhou de <em>${esc(u.nome)}</em> por <em>${fmtDif(dif)}</em>.`;
+    else if(dif === 0) cmp.innerHTML = `Empatou com <em>${esc(u.nome)}</em>. No centésimo!`;
+    else { cmp.classList.add('perdeu'); cmp.innerHTML = `Faltou <em>${fmtDif(-dif)}</em> pra pegar ${esc(u.nome)}.`; }
+  } else if(J.origem === 'pronta' || J.origem === 'dia'){
+    const c = J.origem === 'pronta' ? tempoCasa(J.extra.i) : (J.fase.par ? { cs: J.fase.par } : null);
+    if(c){ const dif = c.cs - cs; if(dif > 0) cmp.innerHTML = `Ganhou da casa por <em>${fmtDif(dif)}</em>.`; else if(dif === 0) cmp.innerHTML = `Empatou com a casa: <em>${fmt2(c.cs)} s</em>. Pula, gira, tira uns centésimos.`; else { cmp.classList.add('perdeu'); cmp.innerHTML = `A casa desceu em <em>${fmt2(c.cs)} s</em>. Faltou ${fmtDif(-dif)}.`; } }
+    else cmp.textContent = '';
+  } else cmp.innerHTML = 'Chegou! Agora é tua vez de <em>duvidar</em> alguém.';
+  $('fRec').textContent = J.recorde ? (J.antes === undefined ? 'Primeiro tempo teu nessa ladeira.' : `Recorde teu! O de antes era ${fmt2(J.antes)} s.`) : `Teu recorde aqui: ${fmt2(recs[J.id])} s.`;
+  const fm = $('fManda'); fm.hidden = false;
+  fm.textContent = J.origem === 'teste' ? 'Mandar o desafio' : J.origem === 'desafio' ? 'Devolver' : 'Duvidar alguém';
+  $('fEditor').hidden = J.origem !== 'teste';
+  $('fMenu').textContent = J.origem === 'desafio' ? 'Voltar pro desafio' : J.origem === 'teste' ? 'Começo' : 'Outra ladeira';
+  soCartao('fim');
+}
+const fmtDif = c => c >= 10 ? fmt1(c) + ' s' : fmt2(c) + ' s';
+
+/* ---------- o link, a mensagem e o nome ---------- */
+function linkBase(){
+  let solto = false; try{ solto = window.self === window.top; }catch(e){ solto = false; }
+  if(solto) return location.href.split('#')[0];
+  return LINK_DO_ARTEFATO ? LINK_DO_ARTEFATO.split('#')[0] : '';
+}
+function faseParaMandar(base, corrente, ev){ return { autor: base.autor || '', tracos: base.tracos, carimbos: base.carimbos, corrente, fantasma: Array.isArray(ev) ? ev.slice() : null }; }
+function mensagem(tipo, fase, cs, outro){
+  const cod = codifica(fase), b = linkBase(), link = b ? b + '#' + cod : '';
+  let tx;
+  if(tipo === 'devolve'){
+    tx = outro && outro.cs > cs ? `${outro.nome} fez ${fmt1(outro.cs)} s. Eu fiz ${fmt1(cs)} s. Duvido tu bater.` : `Desci essa ladeira de rolimã em ${fmt1(cs)} s. Duvido tu bater.`;
+  } else tx = `Duvido tu descer essa ladeira de rolimã. Eu desci em ${fmt1(cs)} s.`;
+  return { cod, link, texto: link ? tx + '\n' + link : tx + '\nAbre o Duvido, toca em "Tenho um desafio" e cola esse código:\n' + cod };
+}
+function precisaNome(depois){
+  if(nome){ depois(); return; }
+  pedeNome(depois, 'Antes de mandar');
+}
+let depoisDoNome = null, voltaDoNome = null;
+function pedeNome(depois, olho){
+  depoisDoNome = depois; voltaDoNome = { tela, cartao: CARTOES.find(c => !$(c).hidden) || null };
+  $('nOlho').textContent = olho || 'Teu nome'; $('nCampo').value = nome; $('nErro').hidden = true;
+  soCartao('nome', 'nCampo');
+}
+function confirmaNome(){
+  const n = limpaNome($('nCampo').value);
+  if(!n){ $('nErro').hidden = false; $('nErro').textContent = 'Escreve um nome (ou apelido) pra ir junto no desafio.'; som('erro'); return; }
+  nome = n; guarda('nome', n); som('clique');
+  const f = depoisDoNome; depoisDoNome = null;
+  if(f) f(); else mostraInicio();
+}
+function voltaNome(){
+  const v = voltaDoNome; depoisDoNome = null;
+  if(v && v.cartao && v.cartao !== 'nome') soCartao(v.cartao); else if(tela === 'editor') soCartao(null); else mostraInicio();
+}
+let MANDA = null;
+function abreManda(msg, volta){
+  MANDA = { msg, volta };
+  const b = $('mBolha'); b.textContent = '';
+  const linhas = msg.texto.split('\n');
+  linhas.forEach((l, i) => { const s = document.createElement('span'); if(/^https?:|^dv1/.test(l)) s.className = 'lk'; s.textContent = l; b.appendChild(s); if(i < linhas.length - 1) b.appendChild(document.createTextNode('\n')); });
+  $('mTexto').hidden = true; $('mTexto').value = msg.texto; $('mOk').hidden = true;
+  let solto = false; try{ solto = window.self === window.top; }catch(e){}
+  $('mShare').hidden = !(solto && navigator.share);
+  soCartao('manda');
+}
+function copia(){
+  const tx = MANDA.msg.texto;
+  const ok = () => { $('mOk').hidden = false; $('mOk').textContent = 'Copiado! Agora cola no zap e duvida.'; som('copia'); };
+  const naMao = () => {
+    const t = $('mTexto'); t.hidden = false; t.value = tx; t.focus(); t.select(); try{ t.setSelectionRange(0, tx.length); }catch(e){}
+    let foi = false; try{ foi = document.execCommand('copy'); }catch(e){ foi = false; }
+    if(foi) ok(); else { $('mOk').hidden = false; $('mOk').textContent = 'Seleciona o texto aí em cima e copia na mão.'; }
+  };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx).then(ok, naMao);
+    else naMao();
+  }catch(e){ naMao(); }
+}
+function mandaDoEditor(){
+  if(!editorLiberado()) return;
+  const f = faseParaMandar({ autor: nome, tracos: ED.tracos, carimbos: ED.carimbos }, [{ nome, cs: ED.melhor.cs }], ED.melhor.ev);
+  abreManda(mensagem('desafio', f, ED.melhor.cs), tela === 'jogo' ? 'fim' : 'editor');
+}
+function melhorDaqui(J){
+  const r = recs[J.id], ev = fants[J.id];
+  if(r !== undefined && ev) return { cs: r, ev };
+  return J.sessao;
+}
+function devolve(){
+  const J = JOGO, m = melhorDaqui(J); if(!m) return;
+  const co = (J.fase.corrente || []).filter(c => c.nome !== nome);
+  const remet = (J.fase.corrente || []).slice(-1)[0] || null;
+  co.push({ nome, cs: m.cs });
+  let nova = co;
+  if(co.length > CORRENTE_MAX){ const ai = co.findIndex(c => c.nome === J.fase.autor); nova = ai >= 0 && ai < co.length - CORRENTE_MAX ? [co[ai], ...co.slice(-(CORRENTE_MAX - 1))] : co.slice(-CORRENTE_MAX); }
+  const f = faseParaMandar(J.fase, nova, m.ev);
+  abreManda(mensagem('devolve', f, m.cs, remet && remet.nome !== nome ? remet : null), 'fim');
+}
+function duvidaPronta(){
+  const J = JOGO, m = melhorDaqui(J); if(!m) return;
+  const f = faseParaMandar({ autor: J.origem === 'dia' ? 'Ladeira do dia' : 'Duvido', tracos: J.fase.tracos, carimbos: J.fase.carimbos }, [{ nome, cs: m.cs }], m.ev);
+  abreManda(mensagem('desafio', f, m.cs), 'fim');
+}
+
+/* ---------- o desafio que chegou ---------- */
+function abreCodigo(txt){
+  const m = String(txt || '').match(/dv1[A-Za-z0-9_-]+/g);
+  if(m) for(const c of m){ const f = decodifica(c); if(f){ abreDesafio(f); return true; } }
+  return false;
+}
+function abreDesafio(fase){
+  DESAFIO = fase; tela = 'desafio'; JOGO = null; soltaTrava();
+  const co = fase.corrente || [], ult = co[co.length - 1];
+  $('dQuem').textContent = ult ? ult.nome : (fase.autor || 'Alguém');
+  const ord = co.map((c, i) => ({ ...c, i })).sort((a, b) => a.cs - b.cs || a.i - b.i), L = $('dCorrente'); L.innerHTML = '';
+  ord.forEach((c, k) => { const li = document.createElement('li'); if(k === 0) li.className = 'melhor'; if(c.nome === nome) li.classList.add('eu'); const s = document.createElement('span'); s.textContent = c.nome + (c.nome === fase.autor ? ' (fez a ladeira)' : ''); const t = document.createElement('b'); t.textContent = fmt2(c.cs) + ' s'; li.append(s, t); L.appendChild(li); });
+  L.hidden = !co.length;
+  const id = idFase(fase), r = recs[id];
+  $('dEu').hidden = r === undefined; if(r !== undefined) $('dEu').textContent = 'Teu melhor aqui: ' + fmt2(r) + ' s.';
+  miniatura($('dMini'), fase);
+  soCartao('desafio'); mostraUI();
+  iniciaDemo(fase, fase.fantasma || null);
+}
+
+/* ---------- o editor ---------- */
+const ED = { tracos: [], carimbos: [], ferr: 'lapis', cor: 0, desfaz: [], camY: -40, validado: null, melhor: null, traco: null, gesto: null, dedos: new Map(), pan: null, tela: null, cursor: null, dica: 0, risca: 0, dicaT: 0 };
+(function leRascunho(){
+  const r = leJSON('rascunho', null);
+  if(r && Array.isArray(r.tracos) && Array.isArray(r.carimbos)){
+    ED.tracos = r.tracos.filter(t => t && Array.isArray(t.pts) && t.pts.length >= 4).map(t => ({ cor: (t.cor | 0) & 3, pts: t.pts.map(v => Math.round(+v || 0)) }));
+    ED.carimbos = r.carimbos.filter(c => c && TIPOS.includes(c.tipo)).map(c => ({ tipo: c.tipo, x: Math.round(+c.x || 0), y: Math.round(+c.y || 0), ...(c.tipo === 'turbo' ? { dir: (c.dir | 0) & 15 } : {}) }));
+    ED.validado = r.validado || null; ED.melhor = r.melhor && r.melhor.ev ? r.melhor : null;
+  }
+})();
+let rascunhoT = 0;
+function salvaRascunho(){ clearTimeout(rascunhoT); rascunhoT = setTimeout(() => guardaJSON('rascunho', { tracos: ED.tracos, carimbos: ED.carimbos, validado: ED.validado, melhor: ED.melhor }), 250); }
+const faseDoEditor = () => ({ autor: nome || '', tracos: ED.tracos, carimbos: ED.carimbos, corrente: [], fantasma: null });
+function tintaUsada(extra){ let s = 0; for(const t of ED.tracos){ for(let i = 2; i < t.pts.length; i += 2) s += Math.hypot(t.pts[i] - t.pts[i - 2], t.pts[i + 1] - t.pts[i - 1]); } return s + (extra || 0); }
+let tintaCache = 0;
+function editorLiberado(){ return !!(ED.melhor && ED.validado && ED.validado === ED.id); }
+function mudouEditor(soCarimbo){
+  ED.id = idFase(faseDoEditor());
+  if(soCarimbo && CENA){ CENA.fase = faseDoEditor(); CENA.F = compila(CENA.fase); CENA.yMax = CENA.F.yMax; }
+  else montaCena(faseDoEditor(), compila(faseDoEditor()));
+  tintaCache = tintaUsada();
+  atualizaTinta(); atualizaManda(); salvaRascunho(); dicaEditor();
+}
+function atualizaTinta(extra){
+  const resta = Math.max(0, 1 - (tintaCache + (extra || 0)) / TINTA_MAX);
+  $('tintaBar').style.width = (resta * 100).toFixed(1) + '%';
+  $('tinta').classList.toggle('pouca', resta < .15);
+  $('tinta').querySelector('small').textContent = 'Giz: ' + Math.round(resta * 100) + '%';
+  $('tinta').setAttribute('aria-label', 'Sobra ' + Math.round(resta * 100) + '% do giz');
+}
+function atualizaManda(){ const ok = editorLiberado(); const b = $('eManda'); b.setAttribute('aria-disabled', String(!ok)); b.title = ok ? 'Mandar o desafio' : 'Desce até a chegada primeiro'; }
+function abreEditor(fase){
+  if(fase){ guardaDesfaz(); ED.tracos = JSON.parse(JSON.stringify(fase.tracos)); ED.carimbos = JSON.parse(JSON.stringify(fase.carimbos)); ED.validado = null; ED.melhor = null; ED.camY = -40; }
+  tela = 'editor'; JOGO = null; DEMO = null; soltaTrava(); pedeTrava();
+  soCartao(null); mostraUI(); escolheFerr(ED.ferr, true);
+  mudouEditor(); camY = ED.camY;
+  ED.dica = 0; mostraDicaEd(true);
+}
+function guardaDesfaz(){ ED.desfaz.push(JSON.stringify({ t: ED.tracos, c: ED.carimbos })); if(ED.desfaz.length > 80) ED.desfaz.shift(); }
+function desfaz(){
+  if(tela !== 'editor') return;
+  const s = ED.desfaz.pop(); if(!s){ aviso('Nada pra desfazer.', 1.4); return; }
+  const o = JSON.parse(s); ED.tracos = o.t; ED.carimbos = o.c; som('desfaz'); mudouEditor();
+}
+function limiteEditor(){ const ym = CENA ? CENA.yMax : 150; return Math.min(ALT_MAX + 60 - VH, Math.max(VH * .5, ym + VH * .55)); }
+function rolaEditor(dy){ ED.camY = clamp(ED.camY + dy, -40, Math.max(-40, limiteEditor())); camY = ED.camY; }
+function escolheFerr(f, quieto){
+  ED.ferr = f; document.querySelectorAll('.ferr').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
+  $('cores').hidden = tela !== 'editor' || f !== 'lapis';
+  if(!quieto){ som('clique'); mostraDicaEd(true); }
+}
+function montaCores(){
+  const C = $('cores'); C.innerHTML = '';
+  CORES_GIZ.forEach((c, i) => { const b = document.createElement('button'); b.className = 'cor'; b.style.setProperty('--c', `rgb(${c})`); b.setAttribute('aria-label', 'Giz ' + NOMES_COR[i]); b.setAttribute('aria-pressed', String(i === ED.cor)); b.innerHTML = '<i></i>'; b.addEventListener('click', () => { ED.cor = i; C.querySelectorAll('.cor').forEach((x, j) => x.setAttribute('aria-pressed', String(j === i))); som('clique'); }); C.appendChild(b); });
+}
+// as dicas escritas a giz no alto do editor
+function mostraDicaEd(forca){
+  if(tela !== 'editor') return;
+  const d = $('edDica'); let t = '';
+  const temChegada = ED.carimbos.some(c => c.tipo === 'chegada');
+  if(ED.ferr === 'borracha') t = 'Passa o dedo no giz ou no carimbo pra apagar.';
+  else if(ED.ferr === 'turbo') t = 'Toca pra pôr o turbo e arrasta pra apontar.';
+  else if(ED.ferr === 'mola') t = 'A mola joga o carrinho pro alto. Põe no chão.';
+  else if(ED.ferr === 'cachorro') t = 'O caramelo vai e volta. Encostou, capotou.';
+  else if(ED.ferr === 'chegada') t = 'Só tem uma bandeira. Toca onde a ladeira acaba.';
+  else if(!ED.tracos.length) t = 'Desenha a ladeira com o dedo, saindo da tábua.';
+  else if(ED.tracos.length === 1 && !temChegada) t = 'Tirou o dedo, ficou buraco: vira pulo.';
+  else if(!temChegada) t = 'Põe a CHEGADA lá embaixo.';
+  else if(!editorLiberado()) t = 'Agora desce tu primeiro: Testar.';
+  else t = 'Liberou! Manda o desafio.';
+  if(t !== d.textContent || forca){ d.textContent = t; d.hidden = false; ED.dicaT = 4.5; }
+}
+function dicaEditor(){ mostraDicaEd(false); }
+function mundoDe(e){ const r = cv.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top; return { x: (sx - COLX) / K, y: sy / K + camY, sx, sy }; }
+function carimboEm(w, raio){ let m = null, md = raio * raio; ED.carimbos.forEach((c, i) => { const cy = c.tipo === 'chegada' ? c.y - 40 : c.tipo === 'cachorro' ? c.y - 12 : c.y; const d = (c.x - w.x) ** 2 + (cy - w.y) ** 2; const d2 = c.tipo === 'chegada' ? Math.min(d, (c.x - w.x) ** 2 + (c.y - w.y) ** 2) : d; if(d2 < md){ md = d2; m = i; } }); return m; }
+function chaoPra(x, y){ const ch = chaoEmbaixo(CENA.F, x, y - 30, 110); return ch; }
+function encaixa(c, w){
+  c.x = Math.round(clamp(w.x, 6, LARG - 6));
+  if(c.tipo === 'turbo'){ c.y = Math.round(clamp(w.y, 0, ALT_MAX)); return; }
+  const ch = chaoPra(c.x, w.y);
+  const y = ch === null ? w.y : ch;
+  c.y = Math.round(clamp(c.tipo === 'mola' ? y - 3 : y, 0, ALT_MAX));
+}
+function edDown(e){
+  if(tela !== 'editor') return;
+  audio(); e.preventDefault();
+  try{ cv.setPointerCapture(e.pointerId); }catch(er){}
+  ED.dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if(ED.dedos.size >= 2){
+    // dois dedos: rola a ladeira (o traço que tinha acabado de começar vai embora)
+    if(ED.traco){ if(ED.traco.len < 30 || performance.now() - ED.traco.t0 < 260) ED.traco = null; else fechaTraco(); }
+    ED.gesto = null; ED.pan = { y: mediaDedos(), cam: ED.camY }; return;
+  }
+  if(e.button === 1 || e.button === 2){ ED.pan = { y: e.clientY, cam: ED.camY }; return; }
+  $('apagaTudo').hidden = true;
+  const w = mundoDe(e); ED.tela = { sx: w.sx, sy: w.sy }; ED.cursor = w;
+  $('edDica').hidden = true;
+  const f = ED.ferr;
+  if(f === 'lapis'){
+    if(TINTA_MAX - tintaCache < 6){ semGiz(); return; }
+    const im = imaPonta(w.x, w.y);
+    ED.traco = { cor: ED.cor, pts: im ? [im[0], im[1]] : [clamp(w.x, 0, LARG), clamp(w.y, 0, ALT_MAX)], len: 0, t0: performance.now() };
+  } else if(f === 'borracha'){ ED.gesto = { k: 'apaga', mexeu: false }; apagaEm(w); }
+  else {
+    const i = carimboEm(w, 24);
+    if(i !== null && (ED.carimbos[i].tipo === f || f !== 'turbo')){
+      const c = ED.carimbos[i];
+      ED.gesto = { k: c.tipo === 'turbo' && f === 'turbo' ? 'mira' : 'move', i, antes: JSON.stringify({ t: ED.tracos, c: ED.carimbos }), mexeu: false, w0: w };
+    } else {
+      const n = ED.carimbos.filter(c => c.tipo === f).length;
+      const antes = JSON.stringify({ t: ED.tracos, c: ED.carimbos });
+      if(f === 'chegada' && n >= 1){ const c = ED.carimbos.find(c => c.tipo === 'chegada'); encaixa(c, w); ED.gesto = { k: 'move', i: ED.carimbos.indexOf(c), antes, mexeu: true }; som('carimbo'); mudouEditor(true); return; }
+      if(n >= LIM[f]){ aviso(`No máximo ${LIM[f]} desse por ladeira.`, 2); som('erro'); return; }
+      const c = { tipo: f, x: 0, y: 0 }; if(f === 'turbo') c.dir = 0;
+      encaixa(c, w); ED.carimbos.push(c);
+      ED.gesto = { k: f === 'turbo' ? 'mira' : 'move', i: ED.carimbos.length - 1, antes, mexeu: true, novo: true, w0: w };
+      som('carimbo'); mudouEditor(true);
+    }
+  }
+}
+// a ponta mais perto (de um traço ou da tábua) a menos de um dedinho: o traço novo começa colado nela
+function imaPonta(x, y){
+  const lim = Math.max(10, 14 / K); let m = null, md = lim * lim;
+  const ve = (px, py) => { const d = (px - x) ** 2 + (py - y) ** 2; if(d < md){ md = d; m = [px, py]; } };
+  ve(LARGADA[4], LARGADA[5]);
+  for(const t of ED.tracos){ ve(t.pts[0], t.pts[1]); ve(t.pts[t.pts.length - 2], t.pts[t.pts.length - 1]); }
+  return m;
+}
+function mediaDedos(){ let s = 0; for(const d of ED.dedos.values()) s += d.y; return s / ED.dedos.size; }
+function edMove(e){
+  if(tela !== 'editor') return;
+  if(ED.dedos.has(e.pointerId)) ED.dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if(ED.pan){ const y = ED.dedos.size >= 2 ? mediaDedos() : e.clientY; ED.camY = ED.pan.cam - (y - ED.pan.y) / K; rolaEditor(0); return; }
+  const w = mundoDe(e); ED.cursor = w;
+  if(!ED.dedos.has(e.pointerId)) return;
+  ED.tela = { sx: w.sx, sy: w.sy };
+  if(ED.traco) somaPonto(w);
+  else if(ED.gesto){
+    const g = ED.gesto, c = ED.carimbos[g.i];
+    if(g.k === 'apaga') apagaEm(w);
+    else if(g.k === 'move' && c){ encaixa(c, w); g.mexeu = true; mudouEditor(true); }
+    else if(g.k === 'mira' && c){ const dx = w.x - c.x, dy = w.y - c.y; if(dx * dx + dy * dy > 14 * 14){ const d = dirDe(Math.atan2(dy, dx) / GRAU); if(d !== c.dir){ c.dir = d; g.mexeu = true; mudouEditor(true); } } }
+  }
+}
+function edUp(e){
+  if(tela !== 'editor') return;
+  ED.dedos.delete(e.pointerId);
+  if(ED.pan){ if(ED.dedos.size === 0) ED.pan = null; return; }
+  if(ED.traco) fechaTraco();
+  if(ED.gesto){
+    const g = ED.gesto; ED.gesto = null;
+    if(g.k === 'mira' && !g.mexeu && !g.novo){ const c = ED.carimbos[g.i]; if(c){ c.dir = (c.dir + 2) & 15; g.mexeu = true; som('clique'); } }
+    if(g.mexeu){ if(g.antes){ ED.desfaz.push(g.antes); if(ED.desfaz.length > 80) ED.desfaz.shift(); } mudouEditor(true); }
+  }
+  ED.tela = null;
+}
+function somaPonto(w){
+  const t = ED.traco, n = t.pts.length, lx = t.pts[n - 2], ly = t.pts[n - 1];
+  let x = clamp(w.x, 0, LARG), y = clamp(w.y, 0, ALT_MAX);
+  const d = Math.hypot(x - lx, y - ly); if(d < 2.5) return;
+  const resta = TINTA_MAX - tintaCache - t.len;
+  if(d > resta){ if(resta < 2){ fechaTraco(); semGiz(); return; } x = lx + (x - lx) * resta / d; y = ly + (y - ly) * resta / d; t.pts.push(x, y); t.len += resta; fechaTraco(); semGiz(); return; }
+  t.pts.push(x, y); t.len += d; ED.risca = Math.min(1, ED.risca + d / 30);
+  atualizaTinta(t.len);
+}
+function semGiz(){ aviso('Acabou o giz. Apaga alguma coisa pra desenhar mais.', 2.6); som('erro'); const b = $('tinta'); b.classList.remove('treme'); void b.offsetWidth; b.classList.add('treme'); }
+// fecha o traço: tira os pontos que não fazem falta (Douglas-Peucker) e arredonda pro inteiro
+function simplifica(pts, eps){
+  const n = pts.length / 2; if(n < 3) return pts.slice();
+  const manter = new Uint8Array(n); manter[0] = manter[n - 1] = 1;
+  const pilha = [[0, n - 1]];
+  while(pilha.length){
+    const [a, b] = pilha.pop(); const ax = pts[a * 2], ay = pts[a * 2 + 1], bx = pts[b * 2], by = pts[b * 2 + 1], dx = bx - ax, dy = by - ay, l = Math.hypot(dx, dy) || 1;
+    let md = -1, mi = -1;
+    for(let i = a + 1; i < b; i++){ const d = Math.abs((pts[i * 2] - ax) * dy - (pts[i * 2 + 1] - ay) * dx) / l; if(d > md){ md = d; mi = i; } }
+    if(md > eps){ manter[mi] = 1; pilha.push([a, mi], [mi, b]); }
+  }
+  const o = []; for(let i = 0; i < n; i++) if(manter[i]) o.push(pts[i * 2], pts[i * 2 + 1]); return o;
+}
+function fechaTraco(){
+  const t = ED.traco; ED.traco = null; if(!t) return;
+  let p = simplifica(t.pts, 1.3).map(v => Math.round(v)), q = [];
+  for(let i = 0; i < p.length; i += 2){ if(q.length && q[q.length - 2] === p[i] && q[q.length - 1] === p[i + 1]) continue; q.push(clamp(p[i], 0, LARG), clamp(p[i + 1], 0, ALT_MAX)); }
+  if(q.length < 4){
+    // um toque só (sem arrastar) vira um pontinho de giz de 6 de largura: dá pra fazer degrau
+    if(t.pts.length >= 2 && t.len < 3){ const x = Math.round(t.pts[0]), y = Math.round(t.pts[1]); q = [clamp(x - 3, 0, LARG), y, clamp(x + 3, 0, LARG), y]; } else { atualizaTinta(); return; }
+  }
+  guardaDesfaz(); ED.tracos.push({ cor: t.cor, pts: q }); mudouEditor();
+}
+function apagaEm(w){
+  const r = Math.max(9, 16 / K), r2 = r * r; let mexeu = false;
+  const antes = JSON.stringify({ t: ED.tracos, c: ED.carimbos });
+  for(let k = ED.tracos.length - 1; k >= 0; k--){
+    const p = ED.tracos[k].pts; let toca = false;
+    for(let i = 2; i < p.length && !toca; i += 2){ const ax = p[i - 2], ay = p[i - 1], dx = p[i] - ax, dy = p[i + 1] - ay, l2 = dx * dx + dy * dy || 1; let u = ((w.x - ax) * dx + (w.y - ay) * dy) / l2; u = clamp(u, 0, 1); const ex = w.x - ax - dx * u, ey = w.y - ay - dy * u; if(ex * ex + ey * ey < r2) toca = true; }
+    if(toca){ ED.tracos.splice(k, 1); mexeu = true; }
+  }
+  const i = carimboEm(w, Math.max(16, r)); if(i !== null){ ED.carimbos.splice(i, 1); mexeu = true; }
+  if(mexeu){ if(!ED.gesto || !ED.gesto.mexeu){ ED.desfaz.push(antes); if(ED.desfaz.length > 80) ED.desfaz.shift(); } if(ED.gesto){ ED.gesto.mexeu = true; ED.gesto.antes = null; } som('apaga'); poeira(w.x, w.y, 6, 50); mudouEditor(); }
+}
+function testaEditor(){
+  if(tela !== 'editor') return;
+  if(!ED.tracos.length){ aviso('Desenha a ladeira antes de testar.', 2); som('erro'); return; }
+  ED.camY = camY; jogaFase(faseDoEditor(), 'teste', {});
+}
+function passoEditor(dt){
+  // desenhando perto do pé da tela, a câmera desce sozinha
+  if(ED.traco && ED.tela){
+    const zona = SH - $('edFerr').offsetHeight - SH * .12;
+    if(ED.tela.sy > zona){ const v = clamp((ED.tela.sy - zona) / (SH * .12), 0, 1.4) * 640; const ant = ED.camY; rolaEditor(v * dt); if(ED.camY !== ant) somaPonto({ x: (ED.tela.sx - COLX) / K, y: ED.tela.sy / K + camY }); }
+  }
+  ED.risca = Math.max(0, (ED.risca || 0) - dt * 4);
+  if(ED.dicaT > 0){ ED.dicaT -= dt; if(ED.dicaT <= 0) $('edDica').hidden = true; }
+  camY = ED.camY;
+}
+
+/* ---------- desenhar o quadro ---------- */
+function desenhaCena(dt){
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#0B0A0E'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const sx = tremor > 0 && !reduz ? (Math.random() - .5) * 14 * tremor : 0, sy = tremor > 0 && !reduz ? (Math.random() - .5) * 10 * tremor : 0;
+  desenhaFora(camY);
+  if(!CENA) return;
+  const t0 = Math.floor(camY / TH), t1 = Math.floor((camY + VH) / TH);
+  for(let t = t0; t <= t1; t++) ctx.drawImage(ladrilho(t), Math.round((COLX + sx) * DPR), Math.round(((t * TH - camY) * K + sy) * DPR));
+  ctx.setTransform(K * DPR, 0, 0, K * DPR, (COLX + sx) * DPR, (sy - camY * K) * DPR);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, camY - 60, LARG, VH + 120); ctx.clip();
+  const F = CENA.F, S = JOGO ? JOGO.S : DEMO ? DEMO.S : null, n = S ? S.passos : Math.floor(TEMPO * 120);
+  F.molas.forEach((m, i) => desenhaMola(ctx, m, JOGO && JOGO.molaT[i] > 0 ? Math.sin(JOGO.molaT[i] / .32 * Math.PI) : 0));
+  F.turbos.forEach(tb => desenhaTurbo(ctx, tb, TEMPO));
+  F.caes.forEach((c, i) => { const q = posCao(c, n); desenhaCao(ctx, q[0], q[1], q[2], TEMPO, JOGO && TEMPO - (JOGO.latiu[i] || -9) < .6, i * 1.7); });
+  if(F.chegada) desenhaBandeira(ctx, F.chegada, TEMPO);
+  desenhaPoeira(ctx);
+  if(tela === 'editor'){ extrasEditor(); if(!PARADO) PARADO = novoEstado(F); desenhaCarro(ctx, PARADO.p, 1, 0, 0, corDe(nome), .9); }
+  if(JOGO){
+    const J = JOGO;
+    if(J.G && J.gAlfa > 0.02){
+      const pg = interp(J.G, J.G.fim ? 1 : alfa), gx = (pg[0] + pg[2]) / 2, gy = (pg[1] + pg[3]) / 2, sx2 = (J.S.p[0] + J.S.p[2]) / 2, sy2 = (J.S.p[1] + J.S.p[3]) / 2, longe = Math.hypot(gx - sx2, gy - sy2);
+      desenhaCarro(ctx, pg, J.gVis.lado, J.gVis.giro, J.gVis.pose, corDe(J.gNome), J.gAlfa * clamp(longe / 26, .25, 1));
+      if(longe > 34 || J.S.fim) etiqueta(pg, J.gNome, J.gAlfa);
+    }
+    if(!(J.S.fim && TITULO[J.S.fim.motivo] && ['capotou', 'torto', 'cachorro'].includes(J.S.fim.motivo))) desenhaCarro(ctx, interp(J.S, alfa), J.vis.lado, J.vis.giro, J.vis.pose, corDe(nome), 1);
+  } else if(DEMO) desenhaCarro(ctx, interp(DEMO.S, DEMO.S.fim ? 1 : acc / PASSO), DEMO.vis.lado, DEMO.vis.giro, DEMO.vis.pose, DEMO.cam, 1);
+  desenhaParticulas(ctx);
+  ctx.restore();
+}
+let PARADO = null;
+const IP = new Float64Array(4);
+function interp(S, a){ for(let i = 0; i < 4; i++) IP[i] = S.pa[i] + (S.p[i] - S.pa[i]) * a; return IP; }
+function etiqueta(p, txt, al){
+  const mx = (p[0] + p[2]) / 2, my = Math.min(p[1], p[3]) - 46;
+  ctx.globalAlpha = Math.min(1, al * 2); ctx.font = '700 11px ' + F_TXT; ctx.textAlign = 'center';
+  const w = ctx.measureText(txt).width + 10; ctx.fillStyle = 'rgba(13,12,17,.8)'; ctx.fillRect(mx - w / 2, my - 11, w, 15);
+  ctx.fillStyle = '#F3EEE2'; ctx.fillText(txt, mx, my); ctx.globalAlpha = 1; ctx.textAlign = 'left';
+}
+function extrasEditor(){
+  const x = ctx;
+  // de onde começa: a seta de giz saindo da ponta da tábua
+  if(!ED.tracos.length){
+    const a = .55 + .35 * Math.sin(TEMPO * 4); x.strokeStyle = `rgba(255,201,60,${a})`; x.lineWidth = 3; x.setLineDash([6, 6]); x.lineCap = 'round';
+    x.beginPath(); x.moveTo(134, 158); x.quadraticCurveTo(190, 176, 220, 218); x.stroke(); x.setLineDash([]);
+    x.beginPath(); x.moveTo(212, 214); x.lineTo(221, 220); x.lineTo(224, 209); x.stroke();
+    x.fillStyle = `rgba(255,201,60,${a})`; x.font = '17px ' + F_GIZ; x.fillText('continua daqui', 196, 248);
+  }
+  // o fim do asfalto
+  if(camY + VH > ALT_MAX - 20){ x.strokeStyle = 'rgba(232,64,42,.6)'; x.lineWidth = 2; x.setLineDash([10, 8]); x.beginPath(); x.moveTo(0, ALT_MAX); x.lineTo(LARG, ALT_MAX); x.stroke(); x.setLineDash([]); x.fillStyle = 'rgba(232,64,42,.8)'; x.font = '15px ' + F_GIZ; x.fillText('daqui pra baixo não dá', 120, ALT_MAX + 22); }
+  if(ED.traco) gizTraco(x, ED.traco.pts, ED.traco.cor, 999);
+  if(ED.cursor && ED.ferr === 'borracha' && !dedoTela){ const r = Math.max(9, 16 / K); x.strokeStyle = 'rgba(243,238,226,.6)'; x.lineWidth = 1.5; x.beginPath(); x.arc(ED.cursor.x, ED.cursor.y, r, 0, 7); x.stroke(); }
+  if(ED.gesto && ED.gesto.k === 'mira'){ const c = ED.carimbos[ED.gesto.i]; if(c){ const d = DIRS[c.dir & 15]; x.strokeStyle = 'rgba(255,201,60,.8)'; x.lineWidth = 2; x.setLineDash([4, 4]); x.beginPath(); x.moveTo(c.x, c.y); x.lineTo(c.x + d[0] * 60, c.y + d[1] * 60); x.stroke(); x.setLineDash([]); } }
+}
+
+/* ---------- a tira da direita: a ladeira inteira, onde tu tá e o que tá aparecendo ---------- */
+let tiraCache = null;
+function alturaTira(){ if(!CENA) return VH; return tela === 'editor' ? Math.max(VH * 1.4, limiteEditor() + VH + 40) : Math.max(VH, CENA.yMax + 220); }
+function desenhaTira(){
+  const W = tiraCv.width, H = tiraCv.height, x = tctx;
+  if(!CENA){ x.clearRect(0, 0, W, H); return; }
+  const alt = alturaTira(), topo = -40, s = H / alt, sx = W / LARG;
+  if(!tiraCache || tiraCache.alt !== alt || tiraCache.cena !== CENA){
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const y = c.getContext('2d');
+    y.fillStyle = '#100F14'; y.fillRect(0, 0, W, H);
+    y.fillStyle = 'rgba(255,201,60,.5)'; y.fillRect(0, 0, 1.5 * DPR, H); y.fillRect(W - 1.5 * DPR, 0, 1.5 * DPR, H);
+    y.lineCap = 'round';
+    for(const t of CENA.tracos){ const c2 = CORES_GIZ[t.cor] || CORES_GIZ[0]; y.strokeStyle = `rgba(${c2},.9)`; y.lineWidth = Math.max(1.2 * DPR, 1); y.beginPath(); for(let i = 0; i < t.pts.length; i += 2){ const px = t.pts[i] * sx, py = (t.pts[i + 1] - topo) * s; i ? y.lineTo(px, py) : y.moveTo(px, py); } y.stroke(); }
+    if(CENA.F.chegada){ const c3 = CENA.F.chegada; y.fillStyle = '#F3EEE2'; y.fillRect(c3.x * sx - 3 * DPR, (c3.y - topo) * s - 6 * DPR, 6 * DPR, 6 * DPR); y.fillStyle = '#141218'; y.fillRect(c3.x * sx - 3 * DPR, (c3.y - topo) * s - 6 * DPR, 3 * DPR, 3 * DPR); y.fillRect(c3.x * sx, (c3.y - topo) * s - 3 * DPR, 3 * DPR, 3 * DPR); }
+    tiraCache = { c, alt, cena: CENA };
+  }
+  x.drawImage(tiraCache.c, 0, 0);
+  const y0 = (camY - topo) * s, y1 = (camY + VH - topo) * s;
+  x.fillStyle = 'rgba(243,238,226,.1)'; x.fillRect(0, y0, W, y1 - y0);
+  x.strokeStyle = 'rgba(243,238,226,.75)'; x.lineWidth = 1.5 * DPR; x.strokeRect(1, y0, W - 2, y1 - y0);
+  const S = JOGO ? JOGO.S : DEMO ? DEMO.S : null;
+  if(S){ const mx = (S.p[0] + S.p[2]) / 2, my = (S.p[1] + S.p[3]) / 2; x.fillStyle = '#FFC93C'; x.beginPath(); x.arc(clamp(mx * sx, 3 * DPR, W - 3 * DPR), clamp((my - topo) * s, 3 * DPR, H - 3 * DPR), 3.4 * DPR, 0, 7); x.fill(); }
+}
+function tiraPara(e){ if(tela !== 'editor') return; const r = tiraCv.getBoundingClientRect(); const f = clamp((e.clientY - r.top) / r.height, 0, 1); ED.camY = -40 + f * alturaTira() - VH / 2; rolaEditor(0); }
+
+/* ---------- a trava da tela (pra não apagar no meio da descida) ---------- */
+let trava = null;
+async function pedeTrava(){ try{ if('wakeLock' in navigator && !trava){ trava = await navigator.wakeLock.request('screen'); trava.addEventListener('release', () => { trava = null; }); } }catch(e){ trava = null; } }
+function soltaTrava(){ try{ if(trava) trava.release(); }catch(e){} trava = null; }
+
+/* ---------- os comandos ---------- */
+const dedosJogo = new Set();
+const ehControle = el => !!(el && el.closest && el.closest('button, input, textarea, a, .cartao, .aviso, #tira'));
+app.addEventListener('pointerdown', e => {
+  if(tela === 'jogo'){ if(ehControle(e.target)) return; e.preventDefault(); const vazio = dedosJogo.size === 0; dedosJogo.add(e.pointerId); if(vazio) apertou(); }
+}, { passive: false });
+const largaDedo = e => { if(dedosJogo.delete(e.pointerId) && dedosJogo.size === 0) soltou(); };
+addEventListener('pointerup', largaDedo); addEventListener('pointercancel', largaDedo);
+addEventListener('blur', () => { if(dedosJogo.size){ dedosJogo.clear(); soltou(); } teclasJogo.clear(); });
+cv.addEventListener('pointerdown', edDown);
+cv.addEventListener('pointermove', edMove);
+cv.addEventListener('pointerup', edUp); cv.addEventListener('pointercancel', edUp);
+cv.addEventListener('pointerleave', () => { if(tela === 'editor' && !ED.dedos.size) ED.cursor = null; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => { if(tela !== 'editor') return; e.preventDefault(); rolaEditor((e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY) / K); }, { passive: false });
+let tiraDedo = null;
+tiraCv.addEventListener('pointerdown', e => { if(tela !== 'editor') return; e.preventDefault(); tiraDedo = e.pointerId; try{ tiraCv.setPointerCapture(e.pointerId); }catch(er){} tiraPara(e); });
+tiraCv.addEventListener('pointermove', e => { if(e.pointerId === tiraDedo) tiraPara(e); });
+tiraCv.addEventListener('pointerup', () => { tiraDedo = null; }); tiraCv.addEventListener('pointercancel', () => { tiraDedo = null; });
+const teclasJogo = new Set();
+const PULA = ['Space', 'ArrowUp', 'KeyW', 'KeyX', 'KeyK'];
+addEventListener('keydown', e => {
+  const alvoCampo = e.target && /INPUT|TEXTAREA/.test(e.target.tagName);
+  if(tela === 'jogo'){
+    if(!$('fim').hidden || !$('manda').hidden || !$('nome').hidden){ if(e.code === 'Escape'){ e.preventDefault(); saiDoJogo(); } return; }
+    if(PULA.includes(e.code) && !alvoCampo){
+      e.preventDefault(); if(e.repeat) return;
+      const vazio = teclasJogo.size === 0 && dedosJogo.size === 0; teclasJogo.add(e.code); if(vazio) apertou(); return;
+    }
+    if((e.code === 'KeyR' || e.code === 'Enter') && $('fim').hidden && !alvoCampo){ e.preventDefault(); reinicia(); return; }
+    if(e.code === 'Escape'){ e.preventDefault(); saiDoJogo(); return; }
+  } else if(tela === 'editor' && !alvoCampo){
+    if((e.ctrlKey || e.metaKey) && e.code === 'KeyZ'){ e.preventDefault(); desfaz(); return; }
+    const n = '123456'.indexOf(e.key); if(n >= 0 && !e.ctrlKey && !e.metaKey){ escolheFerr(['lapis', 'borracha', 'mola', 'turbo', 'cachorro', 'chegada'][n]); return; }
+    if(e.code === 'KeyT'){ testaEditor(); return; }
+    if(e.code === 'ArrowDown' || e.code === 'PageDown'){ e.preventDefault(); rolaEditor(e.code === 'PageDown' ? VH * .8 : 60); return; }
+    if(e.code === 'ArrowUp' || e.code === 'PageUp'){ e.preventDefault(); rolaEditor(e.code === 'PageUp' ? -VH * .8 : -60); return; }
+    if(e.code === 'Escape'){ e.preventDefault(); mostraInicio(); }
+  } else if(e.code === 'Escape' && !alvoCampo){
+    if(!$('cola').hidden || !$('desafio').hidden) mostraInicio();
+    else if(!$('nome').hidden) voltaNome();
+    else if(!$('manda').hidden) $('mVolta').click();
+  }
+});
+addEventListener('keyup', e => { if(teclasJogo.delete(e.code) && teclasJogo.size === 0 && dedosJogo.size === 0) soltou(); });
+
+$('bReinicia').addEventListener('click', e => { e.stopPropagation(); reinicia(); });
+$('bSai').addEventListener('click', e => { e.stopPropagation(); som('clique'); saiDoJogo(); });
+document.querySelectorAll('.bt-som').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); poeSom(!somOn); }));
+$('pSai').addEventListener('click', e => { e.stopPropagation(); som('clique'); saiDoJogo(); });
+$('pEditor').addEventListener('click', e => { e.stopPropagation(); som('clique'); abreEditor(); });
+$('iFaz').addEventListener('click', () => { audio(); som('clique'); abreEditor(); });
+$('iTenho').addEventListener('click', () => { audio(); som('clique'); $('cTexto').value = ''; $('cErro').hidden = true; soCartao('cola', 'cTexto'); });
+$('iTroca').addEventListener('click', () => { som('clique'); pedeNome(null, 'Teu nome'); });
+$('cVolta').addEventListener('click', () => { som('clique'); mostraInicio(); });
+$('cAbre').addEventListener('click', () => {
+  audio(); const t = $('cTexto').value;
+  if(abreCodigo(t)){ som('clique'); return; }
+  $('cErro').hidden = false; $('cErro').textContent = /dv1/.test(t) ? 'Esse código veio quebrado. Pede pro amigo mandar de novo.' : 'Não achei desafio nenhum aí. Cola a mensagem inteira que o amigo mandou.'; som('erro');
+});
+$('dDesce').addEventListener('click', () => { if(DESAFIO){ som('clique'); jogaFase(DESAFIO, 'desafio', {}); } });
+$('dVolta').addEventListener('click', () => { som('clique'); mostraInicio(); });
+$('nOk').addEventListener('click', confirmaNome);
+$('nCampo').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); confirmaNome(); } });
+$('nVolta').addEventListener('click', () => { som('clique'); voltaNome(); });
+$('fDeNovo').addEventListener('click', () => reinicia());
+$('fManda').addEventListener('click', () => {
+  audio(); som('clique'); const J = JOGO; if(!J) return;
+  if(J.origem === 'teste') precisaNome(mandaDoEditor); else if(J.origem === 'desafio') precisaNome(devolve); else precisaNome(duvidaPronta);
+});
+$('fEditor').addEventListener('click', () => { som('clique'); abreEditor(); });
+$('fMenu').addEventListener('click', () => { som('clique'); const J = JOGO; if(J && J.origem === 'desafio') abreDesafio(J.fase); else mostraInicio(); });
+$('mCopia').addEventListener('click', copia);
+$('mShare').addEventListener('click', () => { try{ navigator.share({ text: MANDA.msg.texto }).catch(() => {}); }catch(e){} });
+$('mVolta').addEventListener('click', () => { som('clique'); if(!MANDA) return mostraInicio(); if(MANDA.volta === 'editor'){ soCartao(null); mostraUI(); } else if(MANDA.volta === 'fim' && JOGO) soCartao('fim'); else mostraInicio(); });
+$('eVolta').addEventListener('click', () => { som('clique'); mostraInicio(); });
+$('eDesfaz').addEventListener('click', desfaz);
+$('eTesta').addEventListener('click', () => { audio(); som('clique'); testaEditor(); });
+$('eManda').addEventListener('click', () => {
+  audio();
+  if(!editorLiberado()){ som('erro'); aviso(ED.carimbos.some(c => c.tipo === 'chegada') ? 'Desce até a chegada primeiro: aí libera.' : 'Põe a CHEGADA e desce até ela: aí libera.', 2.6); return; }
+  som('clique'); precisaNome(mandaDoEditor);
+});
+$('eLixo').addEventListener('click', () => { som('clique'); $('apagaTudo').hidden = !$('apagaTudo').hidden; });
+$('eLixoNao').addEventListener('click', () => { $('apagaTudo').hidden = true; });
+$('eLixoSim').addEventListener('click', () => { guardaDesfaz(); ED.tracos = []; ED.carimbos = []; $('apagaTudo').hidden = true; som('apaga'); mudouEditor(); aviso('Apagou. Se arrependeu? Desfaz.', 2.2); });
+document.querySelectorAll('.ferr').forEach(b => b.addEventListener('click', () => escolheFerr(b.dataset.f)));
+addEventListener('hashchange', () => { const h = location.hash.slice(1); if(h && h !== ultimoHash){ ultimoHash = h; abreCodigo(h); } });
+let ultimoHash = '';
+document.addEventListener('visibilitychange', () => { if(document.hidden){ if(ac) ac.suspend().catch(() => {}); } else { ultimo = performance.now(); if(ac && somOn) ac.resume().catch(() => {}); if(tela === 'jogo' || tela === 'editor') pedeTrava(); } });
+new ResizeObserver(() => { medeTela(); if(tela === 'editor') rolaEditor(0); }).observe(app);
+
+/* ---------- o laço ---------- */
+let ultimo = performance.now();
+function quadro(agora){
+  requestAnimationFrame(quadro);
+  let dt = (agora - ultimo) / 1000; ultimo = agora; if(dt > .1) dt = .1; if(dt < 0) dt = 0;
+  TEMPO += dt;
+  if(tela === 'jogo' && JOGO) passoJogo(dt);
+  else if(tela === 'editor') passoEditor(dt);
+  else if(DEMO) passoDemo(dt);
+  passoParticulas(dt);
+  tremor = Math.max(0, tremor - dt * 1.4);
+  if(avisoT > 0){ avisoT -= dt; if(avisoT <= 0) $('aviso').hidden = true; }
+  if(carimboT > 0){ carimboT -= dt; if(carimboT <= 0) $('carimbo').hidden = true; }
+  desenhaCena(dt); desenhaTira();
+  if(ac){
+    const S = tela === 'jogo' && JOGO && !JOGO.S.fim ? JOGO.S : null;
+    if(S){ const vx = (S.v[0] + S.v[2]) / 2, vy = (S.v[1] + S.v[3]) / 2; atualizaRonco(Math.sqrt(vx * vx + vy * vy), S.c0 || S.c1, 0); }
+    else atualizaRonco(0, false, tela === 'editor' && ED.traco ? ED.risca || 0 : 0);
+  }
+}
+
+/* ---------- começa ---------- */
+medeTela(); montaCores(); poeSom(somOn, true);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => { ladrilhos.clear(); tiraCache = null; });
+{
+  const h = location.hash.slice(1); ultimoHash = h;
+  if(!(h && abreCodigo(h))){ mostraInicio(); if(h) aviso('Esse link veio quebrado. Pede pro amigo mandar de novo.', 3.5); }
+}
+requestAnimationFrame(quadro);
+
+/* ---------- pros testes ---------- */
+window.__duvido = {
+  estado: () => ({ tela, nome, camY: Math.round(camY), cartao: CARTOES.find(c => !$(c).hidden) || null,
+    jogo: JOGO ? { origem: JOGO.origem, titulo: JOGO.titulo, passos: JOGO.S.passos, tempo: tempoAtual(JOGO.S) / 100, fim: JOGO.S.fim, cambalhotas: JOGO.S.cambalhotas, segura: JOGO.S.segura, noChao: !!(JOGO.S.c0 || JOGO.S.c1), x: (JOGO.S.p[0] + JOGO.S.p[2]) / 2, y: (JOGO.S.p[1] + JOGO.S.p[3]) / 2, tentativas: JOGO.tentativas, ev: JOGO.ev.slice(), fantasma: JOGO.gNome || null, id: JOGO.id } : null,
+    editor: { ferramenta: ED.ferr, cor: ED.cor, tracos: ED.tracos.length, pontos: ED.tracos.reduce((a, t) => a + t.pts.length / 2, 0), carimbos: ED.carimbos.map(c => c.tipo), tinta: Math.round(tintaUsada()), tintaMax: TINTA_MAX, liberado: editorLiberado(), desfaz: ED.desfaz.length },
+    desafio: DESAFIO ? { autor: DESAFIO.autor, corrente: DESAFIO.corrente } : null }),
+  codifica, decodifica, simula, rodaGravado, compila, idFase, piloto, desceRobo,
+  prontas: PRONTAS.map(p => p.fase), nomesProntas: PRONTAS.map(p => p.nome), doDia, ladeiraDoDia, diaHoje,
+  faseDoEditor: () => JSON.parse(JSON.stringify(faseDoEditor())),
+  editorCom: fase => abreEditor(fase), editorPronta: i => abreEditor(PRONTAS[i].fase),
+  joga: (fase, origem, extra) => jogaFase(fase, origem || 'desafio', extra || {}), jogaPronta: i => jogaFase(PRONTAS[i].fase, 'pronta', { i }),
+  abreCodigo, toca: apertou, solta: soltou, agenda: lista => { if(JOGO) JOGO.agenda = lista.slice().sort((a, b) => a.n - b.n); }, reinicia, inicio: mostraInicio, editor: () => abreEditor(),
+  mensagem: () => MANDA ? MANDA.msg : null, linkBase, tela: () => ({ SW, SH, K, COLX, COLW, VH, TIRAX, TIRAW }),
+  mundoParaTela: (x, y) => ({ x: COLX + x * K, y: (y - camY) * K }), rola: dy => rolaEditor(dy), sons: () => SONS.slice(), audio: () => ac ? ac.state : 'sem', poeNome: n => { nome = limpaNome(n); guarda('nome', nome); }
+};
+</script>

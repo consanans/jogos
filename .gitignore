@@ -1,0 +1,10 @@
+# o cache da Godot (ela refaz sozinha)
+.godot/
+# os exportados (web, Android, Linux...)
+build/
+# rascunhos e fotos dos testes
+tmp/
+screenshots/
+*.zip
+node_modules/
+.DS_Store

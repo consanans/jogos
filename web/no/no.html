@@ -1,0 +1,1648 @@
+<title>Nó</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Dela+Gothic+One&display=swap">
+<style>
+/* Layout: a tela inteira é a mesa (um canvas). Cada jogador tem a base na sua borda (embaixo, em cima, esquerda, direita),
+   de onde saem as cordas até as bolinhas dele; os avisos aparecem perto da base, virados pra ele. Os cartões (a turma, o fim)
+   ficam por cima, no meio. Tema único escuro de propósito: é jogo de mesa filmado de cima, e o brilho das bolinhas e das
+   cordas precisa do breu pra aparecer no vídeo */
+:root{
+  --breu:#0C0A11;
+  --vidro:rgba(12,10,17,.84);
+  --papel:#F7F1E6;
+  --papel2:#EBE1CF;
+  --tinta:#130F19;
+  --cinza:#A79FB5;
+  --cinza2:#675F74;
+  --rosa:#FF4FA3;
+  --amarelo:#FFD02E;
+  --azul:#3F8CFF;
+  --laranja:#FF7A21;
+  --f-tit:"Dela Gothic One","Arial Black",Impact,sans-serif;
+  --f-txt:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+html{overflow:hidden;background:var(--breu)}
+[hidden]{display:none!important}
+body{position:relative;overflow:hidden;background:var(--breu);color:var(--papel);font-family:var(--f-txt);
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--azul);outline-offset:3px}
+#mesa{position:absolute;top:0;bottom:0;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);overflow:hidden}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#c.mouse{cursor:grab}
+#c.mouse.aperta{cursor:grabbing}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+
+/* os botõezinhos da mesa (só antes de começar) */
+.bt-canto{position:absolute;top:10px;z-index:5;background:var(--vidro);color:var(--papel);border:2px solid rgba(247,241,230,.3);border-radius:20px;padding:6px 13px;font:800 14px var(--f-txt);touch-action:manipulation}
+.bt-canto.esq{left:calc(10px + env(safe-area-inset-left,0px))}
+.bt-canto.dir{right:calc(10px + env(safe-area-inset-right,0px))}
+.bt-canto:focus-visible{outline-color:var(--amarelo)}
+.bt-canto[aria-pressed="false"]{opacity:.55;text-decoration:line-through}
+
+/* os cartões: papel com tinta, como adesivo colado na mesa */
+.cartao{position:absolute;inset:0;margin:auto;z-index:6;width:min(460px,calc(100% - 28px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)));height:-webkit-fit-content;height:fit-content;max-height:calc(100% - 24px);
+  overflow:auto;overscroll-behavior:contain;background:var(--papel);color:var(--tinta);border:3px solid var(--tinta);border-radius:18px;padding:16px 18px 16px;
+  box-shadow:0 10px 0 rgba(0,0,0,.55);display:flex;flex-direction:column;gap:12px;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+.cartao input{-webkit-user-select:text;user-select:text;touch-action:manipulation}
+.cartao button{touch-action:manipulation}
+@media (min-width:900px){.cartao.pc{margin:auto auto auto max(5vw,28px)}}
+.capa-a,.capa-b{display:flex;flex-direction:column;gap:inherit;min-width:0}
+/* celular deitado: a capa vira duas colunas, senão não cabe na altura */
+@media (max-height:520px) and (min-width:620px){
+  #capa{flex-direction:row;align-items:flex-start;width:min(800px,calc(100% - 28px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)));gap:20px}
+  #capa .capa-a,#capa .capa-b{flex:1 1 0;gap:10px}
+  #capa .capa-a{position:sticky;top:0}
+}
+.topo-capa{display:flex;flex-direction:column;align-items:center;gap:4px}
+.marca{display:flex;align-items:center;justify-content:center;gap:4px}
+#logo{width:84px;height:84px;display:block;flex:none}
+.olho{font:900 12px var(--f-txt);letter-spacing:.16em;text-transform:uppercase;text-align:center;color:var(--cinza2);margin:0}
+.cartao h1{margin:0;font-family:var(--f-tit);font-weight:400;font-size:clamp(66px,22vw,96px);line-height:.9;text-align:center;color:var(--tinta);
+  text-shadow:4px 4px 0 var(--rosa),8px 8px 0 var(--azul);letter-spacing:.02em;padding:0 8px 6px 0}
+.cartao h2{margin:0;font-family:var(--f-tit);font-weight:400;font-size:clamp(28px,8.4vw,38px);line-height:1.02;text-align:center;text-wrap:balance}
+.cartao p{margin:0;line-height:1.45;text-wrap:pretty}
+.lead{font-size:15.5px}
+.lead b{font-weight:900}
+.rotulo{font:900 12px var(--f-txt);letter-spacing:.14em;text-transform:uppercase;color:var(--cinza2);margin:0 0 6px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.seg button{border:3px solid var(--tinta);border-radius:12px;background:var(--papel2);color:var(--tinta);min-height:50px;padding:6px 0 4px;font:400 24px/1 var(--f-tit);box-shadow:0 3px 0 var(--tinta)}
+.seg button.solo{font-size:17px}
+.seg button[aria-pressed="true"]{background:var(--tinta);color:var(--papel)}
+.seg button:disabled{opacity:.32;box-shadow:none;cursor:not-allowed}
+.turma{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.turma li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;border:2px solid var(--tinta);border-radius:12px;padding:4px 10px 4px 5px;background:var(--papel2)}
+.ficha{width:34px;height:34px;border-radius:50%;border:3px solid var(--tinta);display:grid;place-items:center;background:var(--c);flex:none}
+.ficha svg{width:58%;height:58%;fill:var(--tinta)}
+.ficha.mini{width:26px;height:26px;border-width:2px}
+.turma input{width:100%;min-width:0;border:0;border-bottom:2px dashed rgba(19,15,25,.35);background:transparent;font:800 17px var(--f-txt);color:var(--tinta);padding:5px 2px 4px;border-radius:0}
+.turma input::placeholder{color:rgba(19,15,25,.42)}
+.turma input:focus{outline:none;border-bottom:2px solid var(--tinta)}
+.turma small{font:800 11px var(--f-txt);letter-spacing:.06em;text-transform:uppercase;color:var(--cinza2);white-space:nowrap}
+.aviso{font:700 13.5px/1.4 var(--f-txt);background:var(--tinta);color:var(--papel);border-radius:10px;padding:8px 11px}
+.aviso b{color:var(--amarelo)}
+.bt{border:3px solid var(--tinta);border-radius:14px;padding:12px 16px;font:900 17px var(--f-txt);box-shadow:0 4px 0 var(--tinta);background:var(--papel2);color:var(--tinta)}
+.bt-vai{background:var(--amarelo);font:400 25px/1.05 var(--f-tit);padding:13px 16px 11px;letter-spacing:.02em}
+.bt:active{transform:translateY(2px);box-shadow:0 2px 0 var(--tinta)}
+/* quando a turma não cabe e o cartão rola, o botão de começar gruda embaixo, sempre à vista */
+.rola #bVai,.rola #bMouse{position:sticky;bottom:0;z-index:2;box-shadow:0 4px 0 var(--tinta),0 14px 0 6px var(--papel)}
+.rola #bVai:active,.rola #bMouse:active{box-shadow:0 2px 0 var(--tinta),0 14px 0 6px var(--papel)}
+.linha{display:flex;gap:10px;flex-wrap:wrap}
+.linha .bt{flex:1 1 130px}
+.mini{justify-content:center;gap:8px}
+.bt-p{border:2px solid var(--tinta);border-radius:20px;padding:6px 13px;font:800 14px var(--f-txt);background:transparent;color:var(--tinta)}
+.bt-p[aria-pressed="false"]{opacity:.5;text-decoration:line-through}
+.link-campo{display:flex;flex-direction:column;gap:4px}
+.link-campo input{width:100%;font:700 14px var(--f-txt);border:2px solid var(--tinta);border-radius:10px;padding:8px 10px;background:#fff;color:var(--tinta)}
+.link-campo small{font:700 12px var(--f-txt);color:var(--cinza2)}
+.rec{font:800 13.5px var(--f-txt);text-align:center;color:var(--cinza2)}
+.desafio{font:800 14px/1.35 var(--f-txt);text-align:center;background:var(--rosa);color:var(--tinta);border:2px solid var(--tinta);border-radius:10px;padding:7px 10px}
+.regras{border-top:2px dashed rgba(19,15,25,.25);padding-top:10px}
+.regras summary{font:900 14px var(--f-txt);cursor:pointer;list-style-position:inside}
+.regras summary:focus-visible{outline:3px solid var(--azul);outline-offset:3px;border-radius:4px}
+.regras dl{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;margin:10px 0 0;font-size:14px;line-height:1.35}
+.regras dt{font:400 12px var(--f-tit);background:var(--tinta);color:var(--papel);border-radius:6px;padding:4px 7px 3px;justify-self:start;white-space:nowrap}
+.regras dd{margin:0}
+.fim-tit{display:flex;align-items:center;justify-content:center;gap:10px}
+.fim-tit .ficha{width:44px;height:44px}
+.frase{text-align:center;font:800 15px var(--f-txt);color:var(--cinza2)}
+.numeros{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.numeros div{border:2px solid var(--tinta);border-radius:10px;padding:8px 4px 7px;background:var(--papel2)}
+.numeros b{display:block;font:400 23px/1 var(--f-tit);font-variant-numeric:tabular-nums}
+.numeros span{display:block;font:800 10.5px/1.2 var(--f-txt);letter-spacing:.05em;text-transform:uppercase;color:var(--cinza2);margin-top:4px}
+.ordem{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ordem li{display:grid;grid-template-columns:22px 26px minmax(0,1fr);gap:8px;align-items:center;font-size:14px}
+.ordem li > b:first-child{font:400 15px var(--f-tit)}
+.ordem span.nm{font-weight:900}
+.ordem small{display:block;font-weight:600;color:var(--cinza2)}
+@media (max-width:360px){.cartao{padding:14px 13px 14px;gap:10px}.turma small{display:none}.turma li{grid-template-columns:34px minmax(0,1fr)}.numeros b{font-size:19px}}
+@media (max-height:640px){#logo{width:60px;height:60px}.cartao h1{font-size:60px}.lead{font-size:14px}.cartao{gap:10px;padding-top:12px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="mesa"><canvas id="c" aria-label="A mesa do Nó: bolinhas coloridas, cada uma presa por uma corda à base de quem joga"></canvas></div>
+<div id="falado" class="so-leitor" aria-live="assertive"></div>
+<button id="bVolta" class="bt-canto esq" hidden>&#8249; Voltar</button>
+<button id="bSomCanto" class="bt-canto dir" hidden aria-pressed="true">Som</button>
+
+<section id="capa" class="cartao" aria-labelledby="capaT">
+  <div class="capa-a">
+  <div class="topo-capa">
+    <p class="olho" id="capaOlho">Twister de dedo</p>
+    <div class="marca"><canvas id="logo" width="184" height="184" aria-hidden="true"></canvas><h1 id="capaT">NÓ</h1></div>
+  </div>
+  <p class="lead" id="capaTxt">Celular deitado na mesa, a galera em volta. Cada um segura as bolinhas da sua cor: aparece bolinha nova lá do outro lado, bolinha anda, bolinha troca de lugar. <b>Tirou o dedo, saiu.</b> Quem sobrar ganha.</p>
+  <p class="desafio" id="desafio" hidden></p>
+  </div>
+  <div class="capa-b">
+  <div id="blocoToque">
+    <p class="rotulo" id="rotQtd">Quem joga</p>
+    <div class="seg" id="seg" role="group" aria-labelledby="rotQtd">
+      <button data-n="1" aria-pressed="false" class="solo">Solo</button>
+      <button data-n="2" aria-pressed="true" aria-label="2 pessoas">2</button>
+      <button data-n="3" aria-pressed="false" aria-label="3 pessoas">3</button>
+      <button data-n="4" aria-pressed="false" aria-label="4 pessoas">4</button>
+    </div>
+  </div>
+  <ul id="turma" class="turma" aria-label="A turma"></ul>
+  <p id="aviso" class="aviso" hidden></p>
+  <button id="bVai" class="bt bt-vai">Dar o nó</button>
+  <div id="blocoPC" class="linha" hidden>
+    <button id="bMouse" class="bt bt-vai">Testar no mouse</button>
+  </div>
+  <div class="linha mini">
+    <button id="bSom" class="bt-p" aria-pressed="true">Som</button>
+    <button id="bVoz" class="bt-p" aria-pressed="true">Voz</button>
+    <button id="bLink" class="bt-p" hidden>Passar o link</button>
+  </div>
+  <div id="linkCampo" class="link-campo" hidden><input id="linkTxt" readonly aria-label="Link do Nó"><small>Copia esse link e manda pra galera.</small></div>
+  <p id="capaRec" class="rec" hidden></p>
+  <details class="regras">
+    <summary>Como joga</summary>
+    <dl>
+      <dt>NÓ!</dt><dd>Cada um põe um dedo na bolinha do seu lado. Todo mundo segurando, conta 3, 2, 1 e começa.</dd>
+      <dt>DEDO NOVO</dt><dd>Aparece uma bolinha tua, de preferência do outro lado. Põe mais um dedo nela antes do anel acabar, sem soltar os outros.</dd>
+      <dt>ANDA</dt><dd>Tua bolinha escorrega pra outro lugar. Arrasta o dedo junto.</dd>
+      <dt>TROCA</dt><dd>Duas bolinhas trocam de lugar, uma rodando em volta da outra. Os dois dedos vão junto.</dd>
+      <dt>SOLTA UM</dt><dd>Pode tirar um dedo. Respira.</dd>
+      <dt>SAIU</dt><dd>Tirou o dedo e não voltou em meio segundo, ou deixou a bolinha fugir. Quem sobrar ganha; no Solo, vale o tempo.</dd>
+    </dl>
+  </details>
+  </div>
+</section>
+
+<section id="fim" class="cartao" hidden aria-live="polite" aria-labelledby="fimT">
+  <p class="olho" id="fimOlho">Fim do nó</p>
+  <div class="fim-tit"><span id="fimFicha" class="ficha" aria-hidden="true"></span><h2 id="fimT">ROSA GANHOU</h2></div>
+  <p id="fimFrase" class="frase"></p>
+  <div class="numeros">
+    <div><b id="fimDur">0:00</b><span id="fimDurR">durou</span></div>
+    <div><b id="fimDedos">0</b><span>dedos no máximo</span></div>
+    <div><b id="fimNos">0</b><span>nós no máximo</span></div>
+  </div>
+  <ol id="fimOrdem" class="ordem" aria-label="Quem saiu e quando"></ol>
+  <p id="fimRec" class="rec" hidden></p>
+  <div class="linha"><button id="bDeNovo" class="bt bt-vai">De novo</button><button id="bTurma" class="bt">Mudar a turma</button></div>
+  <div class="linha mini">
+    <button id="bDesafio" class="bt-p" hidden>Desafiar alguém</button>
+    <button id="bLink2" class="bt-p" hidden>Passar o link</button>
+  </div>
+  <div id="linkCampo2" class="link-campo" hidden><input id="linkTxt2" readonly aria-label="Link"><small id="linkDica2">Copia e manda.</small></div>
+</section>
+
+<script>
+'use strict';
+// o link desta página no claude.ai (preenchido depois de publicar). Dentro do quadro a página não sabe o próprio endereço.
+const LINK_DO_ARTEFATO = '';
+
+/* ---------- ajudantes ---------- */
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const sorteia = a => a[Math.random() * a.length | 0];
+const embaralha = a => { for(let i = a.length - 1; i > 0; i--){ const k = Math.random() * (i + 1) | 0; [a[i], a[k]] = [a[k], a[i]]; } return a; };
+const guarda = (k, v) => { try{ localStorage.setItem('no-' + k, v); }catch(e){} };
+const le = k => { try{ return localStorage.getItem('no-' + k); }catch(e){ return null; } };
+const mmss = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const suave = s => -(Math.cos(Math.PI * s) - 1) / 2;
+const sobra = s => { const c = 1.70158; return 1 + (c + 1) * Math.pow(s - 1, 3) + c * Math.pow(s - 1, 2); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const mqReduz = matchMedia('(prefers-reduced-motion: reduce)');
+let reduz = mqReduz.matches;
+try{ mqReduz.addEventListener('change', e => { reduz = e.matches; }); }catch(e){}
+const TEM_TOQUE = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+// sem toque nenhum é computador: o Nó explica e deixa testar o Solo no mouse
+const MODO_PC = !TEM_TOQUE;
+// quantos dedos a tela aguenta (iPhone 5, Android costuma 10); sem a informação, 5
+let LIMITE = clamp((navigator.maxTouchPoints | 0) > 0 ? navigator.maxTouchPoints | 0 : (TEM_TOQUE ? 5 : 1), 1, 10);
+const FOLGA_SOLTO = .5, FOLGA_FORA = .3;
+
+/* ---------- quem joga ---------- */
+// sem verde: rosa, amarelo, azul e laranja, e cada um com uma forma, pra quem não separa as cores
+const CORES = [
+  { k: 'rosa', nome: 'Rosa', c: '#FF4FA3', rgb: [255, 79, 163], forma: 'circulo', lado: 'baixo', pele: '#F1C7A2', nota: 523.25 },
+  { k: 'amarelo', nome: 'Amarelo', c: '#FFD02E', rgb: [255, 208, 46], forma: 'quadrado', lado: 'cima', pele: '#C68A55', nota: 587.33 },
+  { k: 'azul', nome: 'Azul', c: '#3F8CFF', rgb: [63, 140, 255], forma: 'triangulo', lado: 'esq', pele: '#86512D', nota: 659.25 },
+  { k: 'laranja', nome: 'Laranja', c: '#FF7A21', rgb: [255, 122, 33], forma: 'estrela', lado: 'dir', pele: '#E2AA6E', nota: 783.99 }
+];
+const LADO_TXT = { baixo: 'embaixo', cima: 'em cima', esq: 'na esquerda', dir: 'na direita' };
+// o giro de cada lado: tudo que é pra um jogador é desenhado como se ele estivesse embaixo, e gira
+const ROT = { baixo: 0, cima: Math.PI, esq: Math.PI / 2, dir: -Math.PI / 2 };
+const TINTA = '#130F19', PAPEL = '#F7F1E6';
+const FT = '"Dela Gothic One","Arial Black",Impact,sans-serif';
+const FX = '"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+const rgba = (c, a) => `rgba(${c.rgb[0]},${c.rgb[1]},${c.rgb[2]},${a})`;
+
+const FRASES_SAIU = {
+  soltou: ['Desatou.', 'Mão de manteiga.', 'Virou plateia.', 'Agora só torce.', 'Saiu do bonde.', 'Escorregou no quiabo.'],
+  nao_pegou: ['Braço curto.', 'Faltou dedo.', 'Não alcançou.', 'Ficou no quase.'],
+  escapou: ['A bolinha fugiu.', 'Ficou pra trás.', 'Perdeu o bonde.', 'Largou a corda.']
+};
+const FRASES_GANHOU = ['O nó mais firme da mesa.', 'Dedo de aço.', 'Ninguém desata isso.', 'Mão de cola.', 'Segurou o rojão.'];
+const fraseSolo = s => s < 20 ? 'Esquentou e já foi.' : s < 45 ? 'Deu pro gasto.' : s < 75 ? 'Mão firme, hein.' : s < 110 ? 'Isso é dedo ou parafuso?' : 'Tu é feito de velcro.';
+
+/* ---------- a mesa ---------- */
+const cv = $('c'), ctx = cv.getContext('2d'), mesaEl = $('mesa');
+let CW = 1, CH = 1, DPR = 1;        // o canvas, em pontos CSS
+let W = 1, H = 1;                    // o tabuleiro: no jogo é a tela toda; no computador, a demonstração cabe num celular desenhado
+let R = 44, BR = 30, MARG = 56, SEP = 104;
+const vista = { pc: false, x: 0, y: 0, e: 1 };
+let fundo = null, fundoPC = null;
+
+function mede(){
+  const r = mesaEl.getBoundingClientRect();
+  CW = Math.max(1, Math.round(r.width)); CH = Math.max(1, Math.round(r.height));
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+  ajustaTabuleiro();
+}
+function ajustaTabuleiro(){
+  const W0 = W, H0 = H;
+  if(vista.pc){
+    // o celular deitado na mesa, à direita (ou atrás do cartão, se a janela for estreita)
+    const PW = 360, PH = 740, aro = 16, larga = CW >= 900;
+    const ax = larga ? CW * .44 : 0, aw = larga ? CW * .56 : CW;
+    vista.e = clamp(Math.min((aw - 70) / (PW + aro * 2), (CH - 70) / (PH + aro * 2)), .3, 1.15);
+    W = PW; H = PH; vista.x = ax + (aw - PW * vista.e) / 2; vista.y = (CH - PH * vista.e) / 2;
+  } else { vista.e = 1; vista.x = 0; vista.y = 0; W = CW; H = CH; }
+  R = clamp(Math.min(W, H) * .115, 40, 46); BR = Math.round(R * .68); MARG = R + 12; SEP = 2 * R + 16;
+  fundo = null; fundoPC = null;
+  if(!B.length || (W0 === W && H0 === H) || W0 <= 1) return;
+  const fx = W / W0, fy = H / H0;
+  if(fase === 'segura' && !retomando){
+    // antes de começar, cada bolinha de partida volta pro seu lugar
+    for(const j of J){ const b = bolasDe(j)[0]; if(b){ const p = local(j, 0, -dInicio(j)); b.x = p.x; b.y = p.y; } }
+  } else if(Math.max(Math.abs(fx - 1), Math.abs(fy - 1)) < .15){
+    // mudou pouco (a barra do navegador): nada sai do lugar, só não deixa ninguém fora da mesa
+    for(const b of B){ b.x = clamp(b.x, MARG, W - MARG); b.y = clamp(b.y, MARG, H - MARG); }
+  } else {
+    // girou: tudo vai junto e, no meio do nó, pausa pra todo mundo achar a bolinha de novo
+    reescala(fx, fy);
+    if(!demo && (fase === 'jogo' || fase === 'conta')) retoma(false);
+  }
+}
+function reescala(fx, fy){
+  // girou a tela no meio: tudo vai junto, e o que tava andando para onde está
+  for(const b of B){ if(b.mov){ b.mov = null; } b.x = clamp(b.x * fx, MARG, W - MARG); b.y = clamp(b.y * fy, MARG, H - MARG); for(const q of b.corda.p){ q.x *= fx; q.y *= fy; } }
+  for(const t of T.values()) if(t.bot){ t.x *= fx; t.y *= fy; }
+}
+function doCliente(cx, cy){ const r = mesaEl.getBoundingClientRect(); return { x: (cx - r.left - vista.x) / vista.e, y: (cy - r.top - vista.y) / vista.e }; }
+
+function ancora(j){
+  switch(j.lado){ case 'baixo': return { x: W / 2, y: H }; case 'cima': return { x: W / 2, y: 0 }; case 'esq': return { x: 0, y: H / 2 }; default: return { x: W, y: H / 2 }; }
+}
+// um ponto no "chão" do jogador: lx ao longo da borda dele, ly entrando na mesa (negativo)
+function local(j, lx, ly){
+  const a = ancora(j), r = ROT[j.lado], c = Math.round(Math.cos(r)), s = Math.round(Math.sin(r));
+  return { x: a.x + lx * c - ly * s, y: a.y + lx * s + ly * c };
+}
+const bordaDe = j => j.lado === 'baixo' || j.lado === 'cima' ? W : H;   // o comprimento da borda dele
+const fundoDe = j => j.lado === 'baixo' || j.lado === 'cima' ? H : W;   // quanto a mesa entra a partir dele
+const dInicio = j => clamp((fundoDe(j) - SEP) / 2, BR + R + 8, 140);
+const ancoraCorda = (j, slot) => local(j, [0, 12, -12, 24, -24, 36][slot % 6], 0);
+
+/* ---------- o estado ---------- */
+let fase = 'capa';        // capa | segura | conta | jogo | fim
+let demo = false, solo = false, mouseSolo = false;
+let J = [], B = [];
+const T = new Map();      // os toques, pelo identifier
+let tj = 0, proxEv = 0, VEL = 1, auto = true;
+let idSeq = 1, botSeq = 1;
+let eventos = [], ordemSaida = [], parts = [], cordasSoltas = [];
+let tremor = 0, flash = 0, noT = 0;
+let maxDedos = 0, maxNos = 0, nosAgora = 0, cruzes = [];
+let seguraT = 0, contaT = 0, ticN = -1, retomando = false, pausado = false;
+let fimT = 0, fimMostrado = false, vencedor = null, empatados = null;
+let nQtd = 2, nomes = [], desafio = 0;
+const lim = () => demo ? 8 : mouseSolo ? 1 : LIMITE;
+const bolaPorId = id => B.find(b => b.id === id) || null;
+const bolasDe = j => B.filter(b => b.j === j.i);
+const vivos = () => J.filter(j => !j.fora);
+const nomeDe = j => j.apelido || j.cor.nome;
+const jogando = () => fase === 'segura' || fase === 'conta' || fase === 'jogo';
+
+// o ritmo: começa folgado e aperta
+const intervalo = () => 2.5 + 3.5 * Math.exp(-tj / 18);     // 6 s → 2,5 s entre um evento e outro (uns 3 s já aos 30 s)
+const janelaNovo = () => 2.0 + 1.25 * Math.exp(-tj / 45);   // ~3,2 s → 2 s pra pôr o dedo novo
+const durAnda = () => 1.5 + 1.0 * Math.exp(-tj / 45);       // 2,5 s → 1,5 s escorregando
+const durTroca = () => 1.7 + .9 * Math.exp(-tj / 45);
+const tPrev = () => .42 + .25 * Math.exp(-tj / 40);         // o caminho aparece antes de andar
+const capJ = () => solo ? Math.min(lim(), 5) : clamp(Math.ceil(lim() / Math.max(1, vivos().length)), 1, 4);
+const maxMov = () => mouseSolo ? 1 : tj > 45 ? 2 : 1;
+
+/* ---------- as bolinhas e as cordas ---------- */
+function novaBola(j, x, y, estado){
+  const usados = new Set(bolasDe(j).map(b => b.slot)); let slot = 0; while(usados.has(slot)) slot++;
+  const b = { id: idSeq++, j: j.i, x, y, estado, toque: null, slot, nasce: performance.now(), pegou: 0, prazo: Infinity, prazoTot: 0, soltoT: 0, foraT: 0, mov: null, rastro: [], tique: 99, corda: null };
+  const a = ancoraCorda(j, slot), n = 14, p = [];
+  // a corda sai da base e corre até a bolinha
+  for(let i = 0; i < n; i++) p.push({ x: a.x, y: a.y, vx: 0, vy: 0 });
+  b.corda = { p, lado: Math.random() < .5 ? -1 : 1 };
+  B.push(b); return b;
+}
+function passoCorda(b, dt){
+  const j = J[b.j]; if(!j) return;
+  const a = ancoraCorda(j, b.slot), c = b.corda, n = c.p.length;
+  const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  // a corda nunca fica reta: tem uma barriga, e cada pedaço corre atrás do seu lugar com mola (sacode quando a bolinha anda)
+  const barriga = Math.min(56, L * .13) * c.lado, K = 140, am = Math.exp(-15 * dt);
+  c.p[0].x = a.x; c.p[0].y = a.y; c.p[n - 1].x = b.x; c.p[n - 1].y = b.y;
+  for(let i = 1; i < n - 1; i++){
+    const k = i / (n - 1), q = c.p[i], f = 4 * k * (1 - k);
+    const tx = a.x + dx * k + nx * barriga * f, ty = a.y + dy * k + ny * barriga * f;
+    q.vx = (q.vx + (tx - q.x) * K * dt) * am; q.vy = (q.vy + (ty - q.y) * K * dt) * am;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+  }
+}
+// a bolinha que sai leva a corda de volta pra base
+function tiraBola(b, jeito){
+  const i = B.indexOf(b); if(i >= 0) B.splice(i, 1);
+  if(b.toque != null){ const t = T.get(b.toque); if(t && t.bola === b.id) t.bola = null; }
+  cordasSoltas.push({ p: b.corda.p.map(q => ({ x: q.x, y: q.y })), j: b.j, slot: b.slot, t: 0 });
+  if(jeito === 'estouro') particulasEstouro(b); else if(jeito === 'alivio') particulasAlivio(b);
+}
+function passoCordasSoltas(dt){
+  for(let i = cordasSoltas.length - 1; i >= 0; i--){
+    const c = cordasSoltas[i], j = J[c.j]; c.t += dt;
+    if(!j || c.t > .5){ cordasSoltas.splice(i, 1); continue; }
+    const a = ancoraCorda(j, c.slot), k = 1 - Math.exp(-11 * dt);
+    c.p.forEach((q, n) => { const kk = k * (1.6 - n / c.p.length); q.x += (a.x - q.x) * kk; q.y += (a.y - q.y) * kk; });
+  }
+}
+
+// onde a bolinha vai estar num tempo de jogo (pra não marcar lugar em cima do caminho dos outros)
+function posEm(b, t){
+  const m = b.mov; if(!m) return { x: b.x, y: b.y };
+  return m.pos(clamp((t - m.t0 - m.prev) / m.dur, 0, 1));
+}
+function passoMov(b){
+  const m = b.mov; if(!m) return;
+  const s = (tj - m.t0 - m.prev) / m.dur;
+  if(s >= 0 && !m.foi){ m.foi = true; som(m.tipo === 'troca' ? (m.lider ? 'troca' : null) : 'anda'); }
+  const p = m.pos(clamp(s, 0, 1)); b.x = p.x; b.y = p.y;
+  if(s > 0) b.rastro.push({ x: b.x, y: b.y, t: performance.now() });
+  if(b.rastro.length > 40) b.rastro.shift();
+  if(s >= 1) b.mov = null;
+}
+const fQuad = (p0, c, p1) => s => { const u = suave(s), a = 1 - u; return { x: a * a * p0.x + 2 * a * u * c.x + u * u * p1.x, y: a * a * p0.y + 2 * a * u * c.y + u * u * p1.y }; };
+const fCub = (p0, c1, c2, p1) => s => { const u = suave(s), a = 1 - u; return { x: a * a * a * p0.x + 3 * a * a * u * c1.x + 3 * a * u * u * c2.x + u * u * u * p1.x, y: a * a * a * p0.y + 3 * a * a * u * c1.y + 3 * a * u * u * c2.y + u * u * u * p1.y }; };
+function comprimento(f){ let L = 0, a = f(0); for(let k = 1; k <= 24; k++){ const b = f(k / 24); L += Math.hypot(b.x - a.x, b.y - a.y); a = b; } return L; }
+
+// um lugar onde cabe uma bolinha: longe das outras (e de onde elas vão passar), dos dedos soltos e das bases
+function lugarLivre(x, y, folga){
+  for(const o of B){
+    if(o.mov){ for(let k = 0; k <= 10; k++){ const q = o.mov.pos(k / 10); if(Math.hypot(q.x - x, q.y - y) < folga) return false; } }
+    if(Math.hypot(o.x - x, o.y - y) < folga) return false;
+  }
+  for(const t of T.values()) if(t.bola == null && !t.bot && Math.hypot(t.x - x, t.y - y) < R + 26) return false;
+  for(const j of J){ const a = ancora(j); if(Math.hypot(a.x - x, a.y - y) < R + BR + 16) return false; }
+  return true;
+}
+function caminhoLivre(f, t0, dur, ign){
+  for(let k = 0; k <= 20; k++){
+    const s = k / 20, p = f(s), t = t0 + dur * s;
+    if(p.x < MARG - 2 || p.x > W - MARG + 2 || p.y < MARG - 2 || p.y > H - MARG + 2) return false;
+    // andando, uma pode passar raspando na outra (as bolinhas não se encostam, os dedos sim: faz parte do nó)
+    for(const o of B){ if(ign.has(o.id)) continue; const q = posEm(o, t); if(Math.hypot(q.x - p.x, q.y - p.y) < SEP - 14) return false; }
+    for(const j of J){ const a = ancora(j); if(Math.hypot(a.x - p.x, a.y - p.y) < R + BR + 8) return false; }
+  }
+  return true;
+}
+// a bolinha nova nasce longe da base do dono: o braço tem que cruzar a mesa
+function achaLugar(j){
+  const A = ancora(j), diag = Math.hypot(W, H), meus = bolasDe(j);
+  let melhor = null, ms = -1e9;
+  for(let k = 0; k < 110; k++){
+    const p = { x: rnd(MARG, W - MARG), y: rnd(MARG, H - MARG) };
+    if(!lugarLivre(p.x, p.y, SEP)) continue;
+    let dM = .5; for(const b of meus) dM = Math.min(dM, Math.hypot(p.x - b.x, p.y - b.y) / diag);
+    const sc = Math.hypot(p.x - A.x, p.y - A.y) / diag * 1.25 + dM * .5 + Math.random() * .3;
+    if(sc > ms){ ms = sc; melhor = p; }
+  }
+  return melhor;
+}
+function achaAnda(b){
+  const j = J[b.j], A = ancora(j), diag = Math.hypot(W, H), prev = tPrev(), ign = new Set([b.id]);
+  const minL = Math.min(W, H) * .3;
+  let melhor = null, ms = -1e9;
+  for(let k = 0; k < 90; k++){
+    const p1 = { x: rnd(MARG, W - MARG), y: rnd(MARG, H - MARG) };
+    const dx = p1.x - b.x, dy = p1.y - b.y, L = Math.hypot(dx, dy); if(L < minL) continue;
+    const nx = -dy / L, ny = dx / L, p0 = { x: b.x, y: b.y };
+    let f;
+    if(mouseSolo && Math.random() < .45){
+      // no mouse o caminho às vezes vira um S, que é o que dá pra complicar com um dedo só
+      const o = rnd(.22, .45) * L * (Math.random() < .5 ? -1 : 1);
+      f = fCub(p0, { x: b.x + dx / 3 + nx * o, y: b.y + dy / 3 + ny * o }, { x: b.x + dx * 2 / 3 - nx * o, y: b.y + dy * 2 / 3 - ny * o }, p1);
+    } else { const o = rnd(-.4, .4) * L; f = fQuad(p0, { x: (b.x + p1.x) / 2 + nx * o, y: (b.y + p1.y) / 2 + ny * o }, p1); }
+    // o dedo aguenta uns 430 pontos por segundo de média: caminho comprido ganha mais tempo.
+    // No mouse, que é um dedo só, a bolinha vai ficando mais ligeira (senão dava pra seguir pra sempre)
+    const vmax = mouseSolo ? 430 + Math.min(tj, 120) * 4.5 : 430;
+    const dur = Math.max(durAnda() * (mouseSolo ? clamp(.95 - tj / 240, .5, .95) : 1), comprimento(f) / vmax);
+    if(!caminhoLivre(f, tj + prev, dur, ign)) continue;
+    const sc = Math.hypot(p1.x - A.x, p1.y - A.y) / diag + L / diag * .5 + Math.random() * .35;
+    if(sc > ms){ ms = sc; melhor = { f, prev, dur }; }
+  }
+  return melhor;
+}
+// a troca: as duas rodam uma em volta da outra, sempre de lados opostos (os dedos nunca batem). Perto da borda,
+// o miolo da roda escorrega pra onde tem espaço: no meio do caminho elas ficam em M + v·(c ± h)
+function achaTroca(a, c){
+  const d = Math.hypot(c.x - a.x, c.y - a.y); if(d < 2 * R + 4) return null;
+  const Mx = (a.x + c.x) / 2, My = (a.y + c.y) / 2, ux = (c.x - a.x) / d, uy = (c.y - a.y) / d, vx = -uy, vy = ux, ra = d / 2;
+  const prev = tPrev(), dur = durTroca() * clamp(d / 420, .85, 1.3), ign = new Set([a.id, c.id]), minH = SEP / 2 + 4;
+  // quanto cabe pra cada lado de v, a partir do meio
+  const cabe = sg => { let t = 1e9; const dx = vx * sg, dy = vy * sg;
+    if(dx > 1e-6) t = Math.min(t, (W - MARG - Mx) / dx); else if(dx < -1e-6) t = Math.min(t, (MARG - Mx) / dx);
+    if(dy > 1e-6) t = Math.min(t, (H - MARG - My) / dy); else if(dy < -1e-6) t = Math.min(t, (MARG - My) / dy);
+    return Math.max(0, t); };
+  const mais = cabe(1), menos = cabe(-1);
+  for(const hh of [ra * .62, ra * .5, ra * .4, ra * .3, ra * .22, minH]){
+    const h = Math.max(minH, hh);
+    if(mais + menos < 2 * h) continue;
+    const centro = clamp(0, -menos + h, mais - h);
+    for(const cc of [centro].concat(embaralha([centro + h * .5, centro - h * .5, centro + h, centro - h]))){
+      if(cc + h > mais + 1 || cc - h < -menos - 1) continue;
+      const fa = s => { const th = Math.PI * suave(s), sn = Math.sin(th), cs = Math.cos(th); return { x: Mx - ux * ra * cs + vx * (cc + h) * sn, y: My - uy * ra * cs + vy * (cc + h) * sn }; };
+      const fc = s => { const th = Math.PI * suave(s), sn = Math.sin(th), cs = Math.cos(th); return { x: Mx + ux * ra * cs + vx * (cc - h) * sn, y: My + uy * ra * cs + vy * (cc - h) * sn }; };
+      if(caminhoLivre(fa, tj + prev, dur, ign) && caminhoLivre(fc, tj + prev, dur, ign)) return { fa, fc, prev, dur };
+    }
+  }
+  return null;
+}
+
+/* ---------- os eventos ---------- */
+function registra(tipo, js, extra){
+  eventos.push(Object.assign({ tipo, jogadores: js.map(j => j.i), t: +tj.toFixed(2) }, extra || {}));
+  if(eventos.length > 80) eventos.shift();
+  if(tipo !== 'pegou') js.forEach(j => { j.ultEv = tj; });
+}
+function avisa(js, txt, subs, somK, falaTxt){
+  js.forEach((j, i) => bannerDe(j, txt, Array.isArray(subs) ? subs[i] : subs));
+  if(somK) som(somK, js[0]);
+  if(falaTxt) fala(falaTxt);
+  diz(falaTxt || txt);
+}
+const juntaNomes = js => js.length === 1 ? nomeDe(js[0]) : js.slice(0, -1).map(nomeDe).join(', ') + ' e ' + nomeDe(js[js.length - 1]);
+
+function evNovo(j){
+  if(!j || j.fora || fase !== 'jogo') return null;
+  if(B.length >= lim()) return null;
+  const meus = bolasDe(j);
+  if(meus.some(b => b.estado === 'espera') || meus.length >= capJ()) return null;
+  const p = achaLugar(j); if(!p) return null;
+  const b = novaBola(j, p.x, p.y, 'espera');
+  b.prazoTot = b.prazo = janelaNovo();
+  return b;
+}
+function fazNovo(js){
+  const ok = js.filter(j => evNovo(j));
+  if(!ok.length) return false;
+  ok.forEach(j => registra('novo', [j]));
+  avisa(ok, 'DEDO NOVO!', solo ? 'mais um, sem soltar' : 'põe mais um, sem soltar', 'novo', juntaNomes(ok) + ', dedo novo!');
+  return true;
+}
+function fazAnda(j){
+  if(!j || j.fora || fase !== 'jogo') return false;
+  const cands = embaralha(bolasDe(j).filter(b => b.estado === 'preso' && !b.mov));
+  for(const b of cands){
+    const c = achaAnda(b);
+    if(c){ b.mov = { tipo: 'anda', t0: tj, prev: c.prev, dur: c.dur, pos: c.f, foi: false }; b.rastro = []; registra('anda', [j], { bola: b.id }); avisa([j], 'ANDA!', 'vai junto', 'prepara', solo ? 'Anda!' : nomeDe(j) + ', anda!'); return true; }
+  }
+  return false;
+}
+function fazTroca(lista){
+  if(fase !== 'jogo') return false;
+  const ids = (lista || []).map(j => j.i);
+  const elig = B.filter(b => b.estado === 'preso' && !b.mov && !J[b.j].fora);
+  const pares = [];
+  for(let i = 0; i < elig.length; i++) for(let k = i + 1; k < elig.length; k++){
+    const a = elig[i], c = elig[k];
+    if(!solo && a.j === c.j) continue;
+    if(ids.length === 1 && a.j !== ids[0] && c.j !== ids[0]) continue;
+    if(ids.length >= 2 && !((a.j === ids[0] && c.j === ids[1]) || (a.j === ids[1] && c.j === ids[0]))) continue;
+    const quieto = Math.min(tj - J[a.j].ultEv, tj - J[c.j].ultEv);
+    pares.push({ a, c, sc: Math.hypot(c.x - a.x, c.y - a.y) / Math.hypot(W, H) + clamp(quieto / 8, 0, 1) * .5 + Math.random() * .4 });
+  }
+  pares.sort((p, q) => q.sc - p.sc);
+  for(const { a, c } of pares.slice(0, 24)){
+    const m = achaTroca(a, c);
+    if(!m) continue;
+    a.mov = { tipo: 'troca', t0: tj, prev: m.prev, dur: m.dur, pos: m.fa, foi: false, lider: true }; a.rastro = [];
+    c.mov = { tipo: 'troca', t0: tj, prev: m.prev, dur: m.dur, pos: m.fc, foi: false }; c.rastro = [];
+    const ja = J[a.j], jc = J[c.j];
+    if(ja === jc){ registra('troca', [ja], { bolas: [a.id, c.id] }); avisa([ja], 'TROCA!', 'cruza os dedos', 'prepara', 'Troca!'); }
+    else { registra('troca', [ja, jc], { bolas: [a.id, c.id] }); avisa([ja, jc], 'TROCA!', ['com ' + nomeDe(jc), 'com ' + nomeDe(ja)], 'prepara', nomeDe(ja) + ' e ' + nomeDe(jc) + ', troca!'); }
+    return true;
+  }
+  return false;
+}
+function fazSolta(j){
+  if(!j || j.fora || fase !== 'jogo') return false;
+  const presos = bolasDe(j).filter(b => b.estado === 'preso');
+  const livres = presos.filter(b => !b.mov);
+  if(presos.length < 2 || !livres.length) return false;
+  // descansa o dedo que tá lá há mais tempo
+  const b = livres.reduce((m, x) => x.id < m.id ? x : m);
+  tiraBola(b, 'alivio');
+  registra('solta', [j], { bola: b.id });
+  avisa([j], 'SOLTA UM!', 'ufa', 'solta', solo ? 'Pode soltar um.' : nomeDe(j) + ', pode soltar um.');
+  return true;
+}
+function sorteiaPeso(c){ const tot = c.reduce((s, x) => s + x.w, 0); let r = Math.random() * tot; for(const x of c){ r -= x.w; if(r <= 0) return x; } return c[c.length - 1]; }
+// primeiro sorteia o tipo, depois quem: senão, com quatro na mesa, o ANDA (que todo mundo pode) ganha sempre
+function sorteiaEvento(){
+  const vs = vivos(); if(!vs.length) return false;
+  const tot = B.length, cheio = tot >= lim(), cedo = tj < 16;
+  const nMov = new Set(B.filter(b => b.mov).map(b => b.mov.tipo === 'troca' ? 'tr' + b.mov.t0 : b.id)).size;
+  const esperas = B.filter(b => b.estado === 'espera').length;
+  const presos = j => bolasDe(j).filter(b => b.estado === 'preso');
+  const pj = j => clamp((tj - j.ultEv) / 5, .25, 1.6);
+  const podeNovo = mouseSolo || cheio || esperas >= (tj > 30 ? 2 : 1) ? [] : vs.filter(j => !bolasDe(j).some(b => b.estado === 'espera') && bolasDe(j).length < capJ());
+  const podeSolta = mouseSolo ? [] : vs.filter(j => presos(j).length >= 2 && presos(j).some(b => !b.mov));
+  const podeAnda = nMov >= maxMov() ? [] : vs.filter(j => presos(j).some(b => !b.mov));
+  const soltas = B.filter(b => b.estado === 'preso' && !b.mov);
+  const podeTroca = !mouseSolo && nMov < maxMov() && soltas.length >= 2 && (solo || new Set(soltas.map(b => b.j)).size >= 2);
+  const tipos = [];
+  if(podeNovo.length) tipos.push({ t: 'novo', w: cedo ? 5 : 3 });
+  if(podeSolta.length) tipos.push({ t: 'solta', w: cheio ? 3 : podeSolta.some(j => presos(j).length >= 3) ? 1.2 : .3 });
+  if(podeAnda.length) tipos.push({ t: 'anda', w: mouseSolo ? 1 : cedo ? 1.6 : 2.4 });
+  if(podeTroca) tipos.push({ t: 'troca', w: cedo ? 1.4 : 2.6 });
+  const quem = (lista, peso) => { const c = lista.map(j => ({ j, w: pj(j) * (peso ? peso(j) : 1) })); return c.length ? sorteiaPeso(c).j : null; };
+  while(tipos.length){
+    const c = sorteiaPeso(tipos);
+    let ok = false;
+    if(c.t === 'novo'){
+      // no começo, com a mesa cheia de gente, às vezes são dois dedos novos de uma vez
+      const um = quem(podeNovo, j => bolasDe(j).length === 1 ? 1.5 : 1), js = [um];
+      const outros = podeNovo.filter(j => j !== um);
+      if(outros.length && tot + 2 <= lim() && esperas === 0 && Math.random() < (vs.length >= 3 ? .5 : .22) * (tj < 30 ? 1 : .6)) js.push(quem(outros));
+      ok = fazNovo(js);
+      if(!ok && js.length > 1) ok = fazNovo([um]);
+    }
+    else if(c.t === 'solta'){ for(const j of embaralha(podeSolta.slice()).sort((a, b) => presos(b).length - presos(a).length)){ if(fazSolta(j)){ ok = true; break; } } }
+    else if(c.t === 'anda'){ const l = podeAnda.slice(); while(l.length && !ok){ const j = quem(l); ok = fazAnda(j); l.splice(l.indexOf(j), 1); } }
+    else ok = fazTroca(null);
+    if(ok) return true;
+    tipos.splice(tipos.indexOf(c), 1);
+  }
+  return false;
+}
+
+/* ---------- os toques ---------- */
+function toqueNovo(id, x, y, bot){
+  const t = { id, x, y, bola: null, bot: !!bot, alvo: null, t0: performance.now() };
+  T.set(id, t);
+  if(jogando()) pegaBola(t);
+  return t;
+}
+// o toque que cai numa bolinha que espera dedo (nova, ou que acabou de ficar sem) vira o dedo dela
+function pegaBola(t){
+  let melhor = null, md = Infinity;
+  for(const b of B){
+    if(b.estado !== 'espera' && b.estado !== 'solto') continue;
+    const d = Math.hypot(t.x - b.x, t.y - b.y);
+    if(d <= R + 12 && d < md){ md = d; melhor = b; }
+  }
+  if(!melhor) return false;
+  const era = melhor.estado;
+  melhor.estado = 'preso'; melhor.toque = t.id; melhor.foraT = 0; t.bola = melhor.id; t.alvo = null;
+  if(fase === 'jogo'){
+    if(era === 'espera'){ melhor.pegou = performance.now(); registra('pegou', [J[melhor.j]], { bola: melhor.id, sobrou: +melhor.prazo.toFixed(2) }); som('pega', J[melhor.j]); faiscas(melhor.x, melhor.y, J[melhor.j].cor, 10); }
+    else som('volta');
+  } else som('pega', J[melhor.j]);
+  return true;
+}
+function toqueMove(id, x, y){
+  const t = T.get(id); if(!t) return;
+  t.x = x; t.y = y;
+  if(t.bola == null && jogando()) pegaBola(t);
+}
+function toqueFim(id){
+  const t = T.get(id); if(!t) return;
+  T.delete(id);
+  if(t.bola == null) return;
+  const b = bolaPorId(t.bola); if(!b || b.toque !== id) return;
+  b.toque = null;
+  if(fase === 'jogo'){ b.estado = 'solto'; b.soltoT = FOLGA_SOLTO; b.foraT = 0; som('alerta'); }
+  else if(fase === 'segura' || fase === 'conta') b.estado = 'espera';
+}
+function trataToques(e, tipo){
+  e.preventDefault();
+  if(demo) return;
+  if(tipo === 'start') primeiroGesto(false);
+  for(const tc of e.changedTouches){
+    const id = 't' + tc.identifier, p = doCliente(tc.clientX, tc.clientY);
+    if(tipo === 'start') toqueNovo(id, p.x, p.y); else if(tipo === 'move') toqueMove(id, p.x, p.y); else toqueFim(id);
+  }
+}
+cv.addEventListener('touchstart', e => trataToques(e, 'start'), { passive: false });
+cv.addEventListener('touchmove', e => trataToques(e, 'move'), { passive: false });
+cv.addEventListener('touchend', e => trataToques(e, 'end'), { passive: false });
+// o cancelamento do sistema conta como levantar, com a mesma folga pra voltar
+cv.addEventListener('touchcancel', e => trataToques(e, 'cancel'), { passive: false });
+// o mouse é um dedo só
+let mouseApertado = false;
+cv.addEventListener('mousedown', e => { if(e.button !== 0 || demo) return; e.preventDefault(); primeiroGesto(false); mouseApertado = true; cv.classList.add('aperta'); const p = doCliente(e.clientX, e.clientY); toqueNovo('m', p.x, p.y); });
+addEventListener('mousemove', e => { if(!mouseApertado) return; const p = doCliente(e.clientX, e.clientY); toqueMove('m', p.x, p.y); });
+const soltaMouse = () => { if(!mouseApertado) return; mouseApertado = false; cv.classList.remove('aperta'); toqueFim('m'); };
+addEventListener('mouseup', soltaMouse);
+addEventListener('blur', soltaMouse);
+cv.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => { if(e.target === cv) e.preventDefault(); });
+
+/* ---------- a partida ---------- */
+function iniciaPartida(n, op){
+  op = op || {};
+  demo = !!op.demo; mouseSolo = !!op.mouse; solo = n === 1;
+  vista.pc = demo && MODO_PC; ajustaTabuleiro();
+  J = [];
+  for(let i = 0; i < n; i++){ const cor = CORES[i]; J.push({ i, cor, lado: solo ? 'baixo' : cor.lado, apelido: demo ? '' : (nomes[i] || '').trim(), fora: false, foraEm: null, motivo: null, frase: '', ultEv: -9, banner: null, falhaEm: null, jeitoFalha: null }); }
+  B = []; T.clear(); parts = []; cordasSoltas = []; eventos = []; ordemSaida = [];
+  tj = 0; proxEv = 2; maxDedos = 0; maxNos = 0; nosAgora = 0; cruzes = [];
+  seguraT = 0; contaT = 0; ticN = -1; retomando = false; fimT = 0; fimMostrado = false; vencedor = null; empatados = null; noT = 0; tremor = 0; flash = 0;
+  for(const j of J){ const p = local(j, 0, -dInicio(j)); novaBola(j, p.x, p.y, 'espera'); }
+  if(demo){
+    // na demonstração uns dedos vacilam em horas sorteadas, pra mostrar a partida inteira
+    const ordem = embaralha(J.slice()), horas = [rnd(12, 16), rnd(20, 25), rnd(28, 34)];
+    ordem.slice(0, n - 1).forEach((j, k) => { j.falhaEm = horas[k]; j.jeitoFalha = Math.random() < .5 ? 'solta' : 'longe'; });
+  }
+  fase = 'segura'; fundo = null;
+  cv.classList.toggle('mouse', mouseSolo);
+  if(!demo){
+    $('capa').hidden = true; $('fim').hidden = true;
+    $('bVolta').hidden = false; $('bSomCanto').hidden = false;
+    guarda('partidas', String(+(le('partidas') || 0) + 1));
+    diz(solo ? 'Põe o dedo na bolinha e segura.' : 'Cada um põe um dedo na bolinha do seu lado e segura.');
+  }
+}
+function passoSegura(dt){
+  for(const b of B){
+    if(b.estado !== 'preso') continue;
+    const t = T.get(b.toque);
+    if(!t || Math.hypot(t.x - b.x, t.y - b.y) > R + 18){ if(t) t.bola = null; b.toque = null; b.estado = 'espera'; }
+  }
+  // dedo parado que já tá em cima de uma bolinha (girou a tela, voltou do outro app) pega sem precisar mexer
+  for(const t of T.values()) if(t.bola == null && !t.bot) pegaBola(t);
+  const todos = B.length > 0 && B.every(b => b.estado === 'preso');
+  if(fase === 'segura'){
+    if(todos){ seguraT += dt; if(seguraT >= 1){ fase = 'conta'; contaT = 0; ticN = -1; $('bVolta').hidden = true; $('bSomCanto').hidden = true; } }
+    else seguraT = Math.max(0, seguraT - dt * 2);
+  } else {
+    if(!todos){ fase = 'segura'; seguraT = 0; contaT = 0; som('cancela'); if(!demo){ $('bVolta').hidden = false; $('bSomCanto').hidden = false; } return; }
+    contaT += dt;
+    const n = Math.floor(contaT);
+    if(n !== ticN && n < 3){ ticN = n; som('tic', 3 - n); }
+    if(contaT >= 3) comecaJogo();
+  }
+}
+function comecaJogo(){
+  fase = 'jogo'; noT = performance.now();
+  if(retomando){ proxEv = tj + 2; retomando = false; J.forEach(j => { j.banner = null; }); } else { tj = 0; proxEv = 2; }
+  for(const b of B) b.prazo = Infinity;
+  som('no'); fala('Nó!', true); musicaLiga();
+  flash = .55; tremor = reduz ? 0 : .35;
+  registra('no', J);
+  pedeTrava();
+}
+function passoJogo(dt){
+  tj += dt;
+  for(const b of B) passoMov(b);
+  const saem = new Map();
+  for(const b of B){
+    if(b.estado === 'espera'){
+      b.prazo -= dt;
+      // o relógio da bolinha que espera fica nervoso no fim
+      if(b.prazo < 1.2){ const k = Math.floor(b.prazo / .3); if(k !== b.tique){ b.tique = k; som('tique', 4 - k); } }
+      if(b.prazo <= 0 && !saem.has(b.j)) saem.set(b.j, 'nao_pegou');
+    } else if(b.estado === 'solto'){
+      b.soltoT -= dt;
+      if(b.soltoT <= 0 && !saem.has(b.j)) saem.set(b.j, 'soltou');
+    } else if(b.estado === 'preso'){
+      const t = T.get(b.toque);
+      if(!t){ b.estado = 'solto'; b.soltoT = FOLGA_SOLTO; b.toque = null; continue; }
+      // andando, a bolinha perdoa um pouco mais o dedo que vem atrás
+      const tol = R + (b.mov ? 30 : 18);
+      if(Math.hypot(t.x - b.x, t.y - b.y) > tol){ if(!b.foraT) som('alerta'); b.foraT += dt; if(b.foraT > FOLGA_FORA && !saem.has(b.j)) saem.set(b.j, 'escapou'); }
+      else b.foraT = 0;
+    }
+  }
+  if(saem.size){
+    const vs = vivos(), todosSaem = vs.every(j => saem.has(j.i));
+    for(const [i, motivo] of saem) sai(J[i], motivo);
+    const resto = vivos();
+    if(solo) return termina(null);
+    if(resto.length === 1) return termina(resto[0]);
+    if(!resto.length) return termina(null, todosSaem ? vs : null);
+  }
+  const presos = B.reduce((n, b) => n + (b.estado === 'preso' ? 1 : 0), 0);
+  if(presos > maxDedos) maxDedos = presos;
+  if(auto && tj >= proxEv){ const ok = sorteiaEvento(); proxEv = tj + (ok ? intervalo() : .4); }
+}
+function sai(j, motivo){
+  if(!j || j.fora) return;
+  j.fora = true; j.foraEm = tj; j.motivo = motivo; j.frase = sorteia(FRASES_SAIU[motivo] || FRASES_SAIU.soltou);
+  ordemSaida.push(j);
+  for(const b of bolasDe(j)) tiraBola(b, 'estouro');
+  bannerDe(j, 'SOLTOU!', j.frase, 2.6, true);
+  som('estouro'); tremor = reduz ? 0 : .8; flash = .3;
+  fala(solo ? 'Soltou!' : nomeDe(j) + ' soltou!', true);
+  diz(nomeDe(j) + ' soltou. ' + j.frase);
+  registra('saiu', [j], { motivo });
+  fundo = null;
+}
+function termina(v, emp){
+  fase = 'fim'; fimT = 0; fimMostrado = false; vencedor = v || null; empatados = emp || null;
+  musicaDesliga();
+  for(const b of B) b.mov = null;
+  if(v){
+    v.frase = sorteia(FRASES_GANHOU);
+    bannerDe(v, 'GANHOU!', nomeDe(v) + ' · ' + v.frase, 3.4, true);
+    confete(v); som('vence'); fala(nomeDe(v) + ' ganhou!', true); diz(nomeDe(v) + ' ganhou.');
+  } else if(empatados && empatados.length > 1){
+    empatados.forEach(j => bannerDe(j, 'EMPATE!', 'soltaram junto', 3, true));
+    som('vence'); fala('Empate! Soltaram junto.', true); diz('Empate.');
+  } else if(solo){ som('fimSolo'); }
+  registra('fim', v ? [v] : []);
+}
+function passoFim(dt){
+  fimT += dt;
+  if(!fimMostrado && fimT > (demo ? 3.4 : 2.3)){ fimMostrado = true; if(demo) iniciaDemo(); else mostraFim(); }
+}
+// a página sumiu no meio (trocou de app): ninguém sai; quando volta, todo mundo põe os dedos de novo e conta outra vez
+function retoma(limpa){
+  // trocou de app: o navegador já cancelou os toques. Girou a tela: os dedos continuam e podem escorregar até a bolinha
+  if(limpa !== false) T.clear(); else for(const t of T.values()) t.bola = null;
+  for(const b of B){ if(b.mov){ const p = b.mov.pos(1); b.x = p.x; b.y = p.y; b.mov = null; } b.estado = 'espera'; b.toque = null; b.prazo = Infinity; b.rastro = []; }
+  fase = 'segura'; retomando = true; seguraT = 0; contaT = 0; musicaDesliga();
+  J.filter(j => !j.fora).forEach(j => bannerDe(j, 'VOLTA PRO NÓ', 'dedo em cada bolinha tua', 4));
+  $('bVolta').hidden = false; $('bSomCanto').hidden = false;
+  diz('Pausou. Todo mundo põe os dedos de volta nas bolinhas.');
+}
+
+/* ---------- a demonstração: dedos desenhados jogando sozinhos ---------- */
+function iniciaDemo(){ iniciaPartida(4, { demo: true }); }
+function passoBots(dt){
+  const ts = [...T.values()].filter(t => t.bot);
+  for(const b of B){
+    if(b.estado === 'preso') continue;
+    const j = J[b.j]; if(!j || j.fora) continue;
+    let t = ts.find(x => x.alvo === b.id);
+    if(!t){
+      if(fase === 'jogo' && j.falhaEm != null && tj > j.falhaEm) continue;   // esse vacila e não alcança
+      if(b.botEspera == null) b.botEspera = rnd(.3, .8);
+      b.botEspera -= dt; if(b.botEspera > 0) continue;
+      const a = ancoraCorda(j, b.slot);
+      t = toqueNovo('b' + botSeq++, a.x, a.y, true); t.alvo = b.id; t.jj = j.i; t.mao = b.slot % 2 ? -1 : 1; ts.push(t);
+    }
+    const d = Math.hypot(b.x - t.x, b.y - t.y);
+    if(d > 1){ const k = Math.min(1, 950 * dt / d); toqueMove(t.id, t.x + (b.x - t.x) * k, t.y + (b.y - t.y) * k); }
+  }
+  for(const t of ts){
+    const b = t.bola != null ? bolaPorId(t.bola) : t.alvo != null ? bolaPorId(t.alvo) : null;
+    if(!b){ t.sai = (t.sai || 0) + dt; if(t.sai > .25) T.delete(t.id); continue; }
+    if(t.bola === b.id){ const k = 1 - Math.exp(-15 * dt); t.x += (b.x - t.x) * k; t.y += (b.y - t.y) * k; }
+  }
+  if(fase !== 'jogo') return;
+  for(const j of J){
+    if(j.fora || j.falhaEm == null || tj < j.falhaEm || j.jeitoFalha === 'feito') continue;
+    if(j.jeitoFalha === 'solta'){
+      const t = [...T.values()].find(x => x.bot && x.bola != null && (bolaPorId(x.bola) || {}).j === j.i);
+      if(t) toqueFim(t.id);
+      j.jeitoFalha = 'feito';
+    } else if(!bolasDe(j).some(b => b.estado === 'espera')){
+      if(!fazNovo([j])) { j.jeitoFalha = 'solta'; continue; }
+      j.jeitoFalha = 'feito';
+    } else j.jeitoFalha = 'feito';
+  }
+}
+
+/* ---------- o fim ---------- */
+function mostraFim(){
+  soltaTrava();
+  $('bVolta').hidden = true; $('bSomCanto').hidden = true;
+  const dur = tj, v = vencedor;
+  $('fimDur').textContent = mmss(dur); $('fimDedos').textContent = maxDedos; $('fimNos').textContent = maxNos;
+  const ficha = $('fimFicha'), ordem = $('fimOrdem'), rec = $('fimRec');
+  ordem.innerHTML = ''; rec.hidden = true; $('bDesafio').hidden = true;
+  if(solo){
+    const j = J[0];
+    $('fimOlho').textContent = mouseSolo ? 'Solo no mouse' : 'Solo';
+    $('fimT').textContent = 'AGUENTOU ' + mmss(dur);
+    $('fimDurR').textContent = 'aguentou';
+    ficha.hidden = false; ficha.style.setProperty('--c', j.cor.c); ficha.innerHTML = svgForma(j.cor.forma);
+    $('fimFrase').textContent = fraseSolo(dur) + (j.frase ? ' ' + j.frase : '');
+    const chave = mouseSolo ? 'rec-mouse' : 'rec-solo', ant = +(le(chave) || 0);
+    let txt;
+    if(dur > ant){ guarda(chave, dur.toFixed(1)); txt = ant ? 'Recorde novo! O de antes era ' + mmss(ant) + '.' : 'Teu primeiro recorde.'; }
+    else txt = 'Teu recorde: ' + mmss(ant) + '.';
+    if(desafio && !mouseSolo) txt += dur >= desafio ? ' Bateu o desafio de ' + mmss(desafio) + '!' : ' Faltou ' + mmss(desafio - dur + 1) + ' pro desafio.';
+    rec.textContent = txt; rec.hidden = false;
+    $('bDesafio').hidden = !linkBase() || mouseSolo;
+  } else {
+    $('fimOlho').textContent = 'Fim do nó · ' + J.length + ' na mesa';
+    $('fimDurR').textContent = 'durou';
+    if(v){
+      $('fimT').textContent = nomeDe(v).toUpperCase() + ' GANHOU';
+      ficha.hidden = false; ficha.style.setProperty('--c', v.cor.c); ficha.innerHTML = svgForma(v.cor.forma);
+      $('fimFrase').textContent = v.frase || sorteia(FRASES_GANHOU);
+    } else { $('fimT').textContent = 'EMPATE'; ficha.hidden = true; $('fimFrase').textContent = 'Soltaram no mesmo instante. Ninguém leva.'; }
+    const lista = [];
+    if(v) lista.push({ j: v, txt: 'segurou até o fim' });
+    if(empatados) empatados.forEach(j => lista.push({ j, txt: 'soltou junto, com ' + mmss(j.foraEm) }));
+    ordemSaida.slice().reverse().forEach(j => { if(!empatados || !empatados.includes(j)) lista.push({ j, txt: 'soltou com ' + mmss(j.foraEm) + ' · ' + j.frase }); });
+    let pos = 0, ultEm = null;
+    lista.forEach((it, k) => {
+      const em = it.j === v ? -1 : it.j.foraEm;
+      if(k === 0 || em !== ultEm) pos = k + 1;
+      ultEm = em;
+      const li = document.createElement('li');
+      li.innerHTML = `<b>${pos}º</b><span class="ficha mini" style="--c:${it.j.cor.c}" aria-hidden="true">${svgForma(it.j.cor.forma)}</span><span><span class="nm">${esc(nomeDe(it.j))}</span><small>${esc(it.txt)}</small></span>`;
+      ordem.appendChild(li);
+    });
+  }
+  $('bLink2').hidden = !linkBase();
+  $('linkCampo2').hidden = true;
+  $('bTurma').textContent = MODO_PC ? 'Voltar' : 'Mudar a turma';
+  $('fim').hidden = false;
+  if(!TEM_TOQUE) try{ $('bDeNovo').focus({ preventScroll: true }); }catch(e){}
+}
+
+/* ---------- partículas ---------- */
+function particula(o){ parts.push(Object.assign({ x: 0, y: 0, vx: 0, vy: 0, vida: 1, max: 1, cor: PAPEL, tam: 4, tipo: 'ponto', rot: 0, vr: 0, atrito: 2.6 }, o)); }
+function particulasEstouro(b){
+  const c = J[b.j].cor, n = reduz ? 6 : 24;
+  for(let i = 0; i < n; i++){ const a = rnd(0, TAU), v = rnd(160, 560); particula({ x: b.x, y: b.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: rnd(.5, 1.05), max: 1.05, cor: c.c, tam: rnd(6, 13), tipo: 'forma', forma: c.forma, rot: rnd(0, TAU), vr: rnd(-10, 10), atrito: 3.2 }); }
+  for(let i = 0; i < (reduz ? 3 : 12); i++){ const a = rnd(0, TAU), v = rnd(80, 320); particula({ x: b.x, y: b.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: rnd(.3, .6), max: .6, cor: PAPEL, tam: rnd(2, 4) }); }
+  particula({ x: b.x, y: b.y, tipo: 'anel', vida: .55, max: .55, cor: c.c, tam: R });
+  particula({ x: b.x, y: b.y, tipo: 'anel', vida: .35, max: .35, cor: PAPEL, tam: R * .6 });
+}
+function particulasAlivio(b){
+  const c = J[b.j].cor;
+  particula({ x: b.x, y: b.y, tipo: 'bolha', vida: .75, max: .75, cor: c.c, tam: R, forma: c.forma, rot: ROT[J[b.j].lado] });
+  for(let i = 0; i < (reduz ? 2 : 8); i++){ const a = rnd(0, TAU), v = rnd(30, 110); particula({ x: b.x + Math.cos(a) * R, y: b.y + Math.sin(a) * R, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: rnd(.5, .9), max: .9, cor: rgba(c, .9), tam: rnd(2, 4), atrito: 1.5 }); }
+}
+function faiscas(x, y, c, n, anel){
+  for(let i = 0; i < (reduz ? 2 : n); i++){ const a = rnd(0, TAU), v = rnd(120, 340); particula({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: rnd(.25, .5), max: .5, cor: i % 2 ? PAPEL : c.c, tam: rnd(2, 4), tipo: 'faisca' }); }
+  particula({ x, y, tipo: 'anel', vida: .35, max: .35, cor: c.c, tam: anel || R * .9 });
+}
+function confete(v){
+  const a = local(v, 0, -Math.min(fundoDe(v) * .25, 160)), n = reduz ? 26 : 150, cs = CORES.map(c => c.c).concat([PAPEL, PAPEL]);
+  for(let i = 0; i < n; i++){ const ang = rnd(0, TAU), sp = rnd(160, 820); particula({ x: a.x, y: a.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, vida: rnd(1.4, 2.6), max: 2.6, cor: sorteia(cs), tam: rnd(6, 12), tipo: 'confete', rot: rnd(0, TAU), vr: rnd(-12, 12), atrito: 2.1 }); }
+  particula({ x: a.x, y: a.y, tipo: 'anel', vida: .7, max: .7, cor: v.cor.c, tam: R * 1.5 });
+}
+function passoParticulas(dt){
+  for(let i = parts.length - 1; i >= 0; i--){
+    const p = parts[i]; p.vida -= dt;
+    if(p.vida <= 0){ parts.splice(i, 1); continue; }
+    const am = Math.exp(-p.atrito * dt); p.vx *= am; p.vy *= am; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+  }
+}
+
+/* ---------- os nós: cruzamentos das cordas ---------- */
+function corte(a, b, c, d){
+  const r1 = b.x - a.x, r2 = b.y - a.y, s1 = d.x - c.x, s2 = d.y - c.y, den = r1 * s2 - r2 * s1;
+  if(Math.abs(den) < 1e-9) return null;
+  const qx = c.x - a.x, qy = c.y - a.y, t = (qx * s2 - qy * s1) / den, u = (qx * r2 - qy * r1) / den;
+  return t > 0 && t < 1 && u > 0 && u < 1 ? { x: a.x + r1 * t, y: a.y + r2 * t } : null;
+}
+function contaNos(){
+  const cs = B.filter(b => b.estado !== 'espera');
+  const novos = [];
+  for(let a = 0; a < cs.length; a++) for(let c = a + 1; c < cs.length; c++){
+    const P = cs[a].corda.p, Q = cs[c].corda.p;
+    // os dois primeiros pedaços saem juntos da base: não contam
+    for(let i = 3; i < P.length; i++) for(let k = 3; k < Q.length; k++){
+      const x = corte(P[i - 1], P[i], Q[k - 1], Q[k]); if(x) novos.push(x);
+    }
+  }
+  if(fase === 'jogo'){
+    let nasceu = 0;
+    for(const p of novos){ if(!cruzes.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 28)){ nasceu++; if(!reduz) faiscas(p.x, p.y, { c: PAPEL }, 5, 7); } }
+    if(nasceu && novos.length > nosAgora) som('cruzou');
+  }
+  cruzes = novos; nosAgora = novos.length;
+  if(fase === 'jogo' && nosAgora > maxNos) maxNos = nosAgora;
+}
+
+/* ---------- avisos virados pra cada um ---------- */
+// o tamanho do aviso, igual ao que o desenho vai fazer (pra escolher onde ele cabe)
+function medidaBanner(j, txt){
+  const E = bordaDe(j), maxW = Math.min(E - 44, 440);
+  let fs = 46; ctx.save(); ctx.font = `${fs}px ${FT}`; let w = ctx.measureText(txt).width;
+  if(w + 30 > maxW){ fs = Math.max(16, Math.floor(fs * (maxW - 30) / w)); ctx.font = `${fs}px ${FT}`; w = ctx.measureText(txt).width; }
+  ctx.restore();
+  return { fs, w, bw: w + 30, bh: fs * 1.22 + 10, maxW };
+}
+function paraLocal(j, x, y){ const a = ancora(j), r = ROT[j.lado], c = Math.round(Math.cos(r)), s = Math.round(Math.sin(r)), dx = x - a.x, dy = y - a.y; return { x: dx * c + dy * s, y: -dx * s + dy * c }; }
+function bannerDe(j, txt, sub, dur, fixo){
+  // o aviso vai pro pedaço do lado dele com menos bolinha embaixo: ao longo da borda e, se não der, mais pra dentro da mesa
+  const E = bordaDe(j), F = fundoDe(j), m = medidaBanner(j, txt), mw = m.bw / 2, mh = (m.bh + (sub ? 34 : 0)) / 2;
+  const D0 = profBanner(j), Ds = fixo ? [D0] : [D0, clamp(F * .36, D0 + 60, Math.max(D0 + 60, F / 2 - 30)), clamp(F * .13, 70, D0 - 20)];
+  let lx = 0, D = D0, ms = 1e9;
+  for(const d of Ds) for(const c of fixo ? [0] : [0, -E * .27, E * .27]){
+    const x = clamp(c, -E / 2 + mw + 8, E / 2 - mw - 8);
+    let sc = Math.abs(x) * .02 + Math.abs(d - D0) * .03;
+    // e longe do aviso que já tá na tela pra outra pessoa (deitado, os de lados opostos se encontram no meio)
+    const eu = local(j, x, -d), agora = performance.now();
+    for(const o of J){ const ob = o.banner; if(o === j || !ob || (agora - ob.t0) / 1000 > ob.dur - .2) continue; const q = local(o, ob.lx, -ob.D), dd = Math.hypot(q.x - eu.x, q.y - eu.y); if(dd < 190) sc += (190 - dd) * 6; }
+    for(const b of B){
+      for(const p of b.mov ? [b, b.mov.pos(1)] : [b]){
+        const q = paraLocal(j, p.x, p.y), dx = Math.max(0, Math.abs(q.x - x) - mw), dy = Math.max(0, Math.abs(q.y + d + (sub ? 17 : 0)) - mh), dd = Math.hypot(dx, dy);
+        if(dd < R + 8) sc += (R + 8 - dd) * 10;
+      }
+    }
+    if(sc < ms){ ms = sc; lx = x; D = d; }
+  }
+  j.banner = { txt, sub, t0: performance.now(), dur: dur || 2, lx, D };
+}
+const profBanner = j => clamp(fundoDe(j) * .21, 92, 175);
+function diz(txt){ const d = $('falado'); if(demo) return; d.textContent = ''; setTimeout(() => { d.textContent = txt; }, 30); }
+
+/* ---------- o desenho ---------- */
+function rr(x, X, Y, w, h, r){ r = Math.max(0, Math.min(r, w / 2, h / 2)); x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function forma(x, f, cx, cy, s, rot){
+  x.save(); x.translate(cx, cy); x.rotate(rot); x.beginPath();
+  if(f === 'circulo') x.arc(0, 0, s * .88, 0, TAU);
+  else if(f === 'quadrado') rr(x, -s * .8, -s * .8, s * 1.6, s * 1.6, s * .2);
+  else if(f === 'triangulo'){ x.moveTo(0, -s * 1.08); x.lineTo(s * 1.02, s * .74); x.lineTo(-s * 1.02, s * .74); x.closePath(); }
+  else { for(let i = 0; i < 10; i++){ const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? s * .47 : s * 1.12; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); }
+  x.fill(); x.restore();
+}
+function svgForma(f){
+  if(f === 'circulo') return '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.6"/></svg>';
+  if(f === 'quadrado') return '<svg viewBox="0 0 20 20"><rect x="3.6" y="3.6" width="12.8" height="12.8" rx="1.8"/></svg>';
+  if(f === 'triangulo') return '<svg viewBox="0 0 20 20"><path d="M10 2.6 18 16.6H2z"/></svg>';
+  let d = ''; for(let i = 0; i < 10; i++){ const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 3.9 : 8.6; d += (i ? 'L' : 'M') + (10 + Math.cos(a) * r).toFixed(2) + ' ' + (10.6 + Math.sin(a) * r).toFixed(2); }
+  return '<svg viewBox="0 0 20 20"><path d="' + d + 'Z"/></svg>';
+}
+
+// o nó de três folhas (trifólio), com as quatro cores e o por-cima-por-baixo de verdade
+const NO_P = (() => { const n = 240, p = []; for(let i = 0; i < n; i++){ const t = i / n * TAU; p.push([Math.sin(t) + 2 * Math.sin(2 * t), Math.cos(t) - 2 * Math.cos(2 * t)]); } return p; })();
+const NO_CIMA = (() => {
+  const p = NO_P, n = p.length, achados = [], seg = i => [{ x: p[i][0], y: p[i][1] }, { x: p[(i + 1) % n][0], y: p[(i + 1) % n][1] }];
+  for(let i = 0; i < n; i++) for(let k = i + 2; k < n; k++){
+    if(i === 0 && k === n - 1) continue;
+    const [a, b] = seg(i), [c, d] = seg(k);
+    if(corte(a, b, c, d) && !achados.some(([x, y]) => Math.abs(x - i) < 4 && Math.abs(y - k) < 4)) achados.push([i, k]);
+  }
+  // andando pela corda, os cruzamentos alternam: por cima, por baixo, por cima...
+  const visitas = []; achados.forEach(([i, k]) => { visitas.push(i); visitas.push(k); });
+  visitas.sort((a, b) => a - b);
+  return visitas.filter((v, idx) => idx % 2 === 0);
+})();
+function desenhaNo(x, cx, cy, s, lw){
+  cy += .47 * s;
+  const n = NO_P.length, P = i => { const q = NO_P[((i % n) + n) % n]; return [cx + q[0] * s, cy + q[1] * s]; };
+  const linha = (i0, i1) => { x.beginPath(); for(let i = i0; i <= i1; i++){ const [px, py] = P(i); i === i0 ? x.moveTo(px, py) : x.lineTo(px, py); } };
+  const corDe = i => CORES[Math.floor((((i % n) + n) % n) / (n / 4))].c;
+  x.lineJoin = 'round';
+  x.lineCap = 'round'; linha(0, n); x.strokeStyle = TINTA; x.lineWidth = lw * 1.75; x.stroke();
+  for(let q = 0; q < 4; q++){ linha(q * n / 4, (q + 1) * n / 4); x.strokeStyle = CORES[q].c; x.lineWidth = lw; x.stroke(); }
+  linha(0, n); x.strokeStyle = 'rgba(255,255,255,.28)'; x.lineWidth = lw * .2; x.stroke();
+  x.lineCap = 'butt';
+  for(const v of NO_CIMA){
+    linha(v - 9, v + 10); x.strokeStyle = TINTA; x.lineWidth = lw * 1.75; x.stroke();
+    for(let i = v - 9; i < v + 10;){ let k = i; while(k < v + 10 && corDe(k) === corDe(i)) k++; linha(i, k); x.strokeStyle = corDe(i); x.lineWidth = lw; x.stroke(); i = k; }
+    linha(v - 9, v + 10); x.strokeStyle = 'rgba(255,255,255,.28)'; x.lineWidth = lw * .2; x.stroke();
+  }
+}
+
+const glowCache = {};
+function glowDe(c){
+  if(glowCache[c.k]) return glowCache[c.k];
+  const s = 128, cc = document.createElement('canvas'); cc.width = cc.height = s; const x = cc.getContext('2d');
+  const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, rgba(c, .62)); g.addColorStop(.38, rgba(c, .26)); g.addColorStop(1, rgba(c, 0));
+  x.fillStyle = g; x.fillRect(0, 0, s, s);
+  return glowCache[c.k] = cc;
+}
+
+function pintaFundo(){
+  const k = DPR * vista.e, c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
+  const x = c.getContext('2d'); x.scale(k, k);
+  const g = x.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.hypot(W, H) * .56);
+  g.addColorStop(0, '#1C1628'); g.addColorStop(.55, '#120E1A'); g.addColorStop(1, '#07060B');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // a trama em losango, como borracha de mesa de bar
+  x.fillStyle = 'rgba(247,241,230,.055)';
+  for(let yy = 12, l = 0; yy < H; yy += 20, l++) for(let xx = 12 + (l % 2) * 10; xx < W; xx += 20) x.fillRect(xx - 1, yy - 1, 2, 2);
+  // o grão
+  for(let i = 0, n = W * H / 80; i < n; i++){ x.fillStyle = Math.random() < .55 ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.04)'; x.fillRect(Math.random() * W, Math.random() * H, 1.2, 1.2); }
+  // cada um acende a borda dele
+  for(const j of J){
+    const prof = Math.min(170, fundoDe(j) * .3), E = bordaDe(j), a = ancora(j);
+    x.save(); x.translate(a.x, a.y); x.rotate(ROT[j.lado]);
+    const gr = x.createLinearGradient(0, 0, 0, -prof); gr.addColorStop(0, rgba(j.cor, j.fora ? .05 : .22)); gr.addColorStop(1, rgba(j.cor, 0));
+    x.fillStyle = gr; x.fillRect(-E / 2, -prof, E, prof);
+    x.fillStyle = j.fora ? 'rgba(247,241,230,.12)' : rgba(j.cor, .85); x.fillRect(-E / 2, -4, E, 4);
+    x.restore();
+  }
+  return c;
+}
+function pintaMesaPC(){
+  const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const x = c.getContext('2d'); x.scale(DPR, DPR);
+  // uma mesa de madeira escura, avermelhada (terra roxa), com a luz de um pendente em cima do celular
+  x.fillStyle = '#171012'; x.fillRect(0, 0, CW, CH);
+  for(let i = 0; i < 150; i++){
+    const y = Math.random() * CH, w = 1 + Math.random() * 3.5, s = Math.random() * 6;
+    x.strokeStyle = `rgba(${70 + Math.random() * 40 | 0},${32 + Math.random() * 18 | 0},${34 + Math.random() * 14 | 0},${.1 + Math.random() * .16})`; x.lineWidth = w;
+    x.beginPath(); x.moveTo(-10, y); for(let xx = 0; xx <= CW + 40; xx += 40) x.lineTo(xx, y + Math.sin(xx * .0035 + s) * 7 + Math.sin(xx * .011 + i) * 2); x.stroke();
+  }
+  const cx = vista.x + W * vista.e / 2, cy = vista.y + H * vista.e / 2, g = x.createRadialGradient(cx, cy, 40, cx, cy, Math.max(CW, CH) * .75);
+  g.addColorStop(0, 'rgba(255,206,160,.16)'); g.addColorStop(.5, 'rgba(0,0,0,.2)'); g.addColorStop(1, 'rgba(0,0,0,.66)');
+  x.fillStyle = g; x.fillRect(0, 0, CW, CH);
+  return c;
+}
+
+function batida(){
+  if(ac && mus.on){ const t = ac.currentTime; let ult = -1; for(const p of pulsos) if(p <= t) ult = p; return ult < 0 ? 0 : Math.exp(-(t - ult) * 7); }
+  const bps = bpmAgora() / 60, f = (performance.now() / 1000 * bps) % 1;
+  return Math.exp(-f / bps * 7);
+}
+
+function desenha(agora){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if(vista.pc){
+    if(!fundoPC) fundoPC = pintaMesaPC();
+    ctx.drawImage(fundoPC, 0, 0, CW, CH);
+    const e = vista.e, aro = 13 * e, w = W * e, h = H * e;
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(ctx, vista.x - aro + 12, vista.y - aro + 18, w + aro * 2, h + aro * 2, 40 * e); ctx.fill();
+    ctx.fillStyle = '#050407'; rr(ctx, vista.x - aro, vista.y - aro, w + aro * 2, h + aro * 2, 40 * e); ctx.fill();
+    ctx.strokeStyle = '#3B3448'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.save(); ctx.translate(vista.x, vista.y); ctx.scale(e, e);
+    rr(ctx, 0, 0, W, H, 28); ctx.clip();
+    desenhaTabuleiro(agora);
+    ctx.restore();
+    ctx.save(); ctx.translate(vista.x, vista.y); ctx.scale(e, e);
+    desenhaDedos();
+    // o reflexo do vidro
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, 'rgba(255,255,255,.07)'); g.addColorStop(.4, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; rr(ctx, 0, 0, W, H, 28); ctx.fill();
+    ctx.restore();
+  } else {
+    const tr = tremor > 0 && !reduz ? tremor : 0;
+    ctx.save(); if(tr) ctx.translate((Math.random() - .5) * 16 * tr, (Math.random() - .5) * 16 * tr);
+    desenhaTabuleiro(agora); desenhaDedos();
+    ctx.restore();
+  }
+  if(flash > 0){ ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = `rgba(247,241,230,${flash * .32})`; ctx.fillRect(0, 0, CW, CH); }
+}
+function desenhaTabuleiro(agora){
+  if(!fundo) fundo = pintaFundo();
+  ctx.drawImage(fundo, 0, 0, W, H);
+  desenhaMiolo(agora);
+  desenhaSoloTempo();
+  desenhaBanners(agora);
+  desenhaPrevias();
+  desenhaRastros(agora);
+  desenhaCordasSoltas();
+  for(const b of B) desenhaCorda(b);
+  desenhaCruzes(agora);
+  desenhaBases();
+  for(const b of B) desenhaBola(b, agora);
+  desenhaToques();
+  desenhaParticulas();
+  desenhaContagem(agora);
+}
+function desenhaMiolo(agora){
+  const s = Math.min(W, H) * .085, pb = batida();
+  ctx.save(); ctx.globalAlpha = fase === 'jogo' ? .12 + pb * .05 : .16;
+  ctx.translate(W / 2, H / 2); if(!reduz) ctx.rotate(agora / 14000); ctx.scale(1 + pb * .04, 1 + pb * .04);
+  desenhaNo(ctx, 0, 0, s, s * .34);
+  ctx.restore();
+  if((fase === 'jogo' || fase === 'fim') && nosAgora > 0 && !solo){
+    ctx.save(); ctx.translate(W / 2, H / 2);
+    ctx.font = `${Math.round(R * .9)}px ${FT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 6; ctx.strokeStyle = TINTA; ctx.strokeText(nosAgora, 0, 0); ctx.fillStyle = PAPEL; ctx.globalAlpha = .9; ctx.fillText(nosAgora, 0, 0);
+    // o risquinho embaixo, pra ninguém ler 6 por 9 do outro lado da mesa
+    ctx.fillRect(-R * .22, R * .42, R * .44, 4);
+    ctx.restore();
+  }
+}
+function desenhaSoloTempo(){
+  if(!solo || !(fase === 'jogo' || fase === 'fim')) return;
+  const fs = Math.round(clamp(W * .1, 30, 48));
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = `${fs}px ${FT}`; ctx.lineWidth = 6; ctx.strokeStyle = TINTA; ctx.strokeText(mmss(tj), W / 2, 14); ctx.fillStyle = PAPEL; ctx.fillText(mmss(tj), W / 2, 14);
+  const rec = +(le(mouseSolo ? 'rec-mouse' : 'rec-solo') || 0);
+  ctx.font = `800 12px ${FX}`; ctx.fillStyle = 'rgba(247,241,230,.62)';
+  const t = rec ? (tj > rec ? 'RECORDE NOVO' : 'RECORDE ' + mmss(rec)) : 'SOLO';
+  ctx.fillText(desafio && !mouseSolo ? t + ' · DESAFIO ' + mmss(desafio) : t, W / 2, 18 + fs);
+  ctx.restore();
+}
+function desenhaBanners(agora){
+  for(const j of J){
+    if(fase === 'segura' && !retomando && !j.fora){ desenhaRotuloSegura(j); }
+    const bn = j.banner; if(!bn) continue;
+    const idade = (agora - bn.t0) / 1000;
+    if(idade > bn.dur){ j.banner = null; continue; }
+    const ent = clamp(idade / .24, 0, 1), sai = clamp((bn.dur - idade) / .32, 0, 1);
+    const esc = reduz ? 1 : idade < .24 ? lerp(.5, 1, sobra(ent)) : 1;
+    const E = bordaDe(j), D = bn.D || profBanner(j);
+    ctx.save();
+    const a = ancora(j); ctx.translate(a.x, a.y); ctx.rotate(ROT[j.lado]);
+    let fs = 46; ctx.font = `${fs}px ${FT}`; let w = ctx.measureText(bn.txt).width;
+    const maxW = Math.min(E - 44, 440);
+    if(w + 30 > maxW){ fs = Math.max(16, Math.floor(fs * (maxW - 30) / w)); ctx.font = `${fs}px ${FT}`; w = ctx.measureText(bn.txt).width; }
+    const bw = w + 30, bh = fs * 1.22 + 10;
+    const lx = clamp(bn.lx, -E / 2 + bw / 2 + 8, E / 2 - bw / 2 - 8);
+    ctx.translate(lx, -D - (reduz ? 0 : (1 - sai) * 14)); ctx.rotate(-.045); ctx.scale(esc, esc); ctx.globalAlpha = Math.min(1, sai * 1.2) * (reduz ? Math.min(1, ent * 2) : 1);
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; rr(ctx, -bw / 2 + 5, -bh / 2 + 7, bw, bh, 11); ctx.fill();
+    ctx.fillStyle = j.fora && bn.txt !== 'SOLTOU!' ? '#4A4356' : j.cor.c; rr(ctx, -bw / 2, -bh / 2, bw, bh, 11); ctx.fill();
+    ctx.lineWidth = 3.5; ctx.strokeStyle = TINTA; ctx.stroke();
+    ctx.fillStyle = TINTA; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(bn.txt, 0, fs * .04 + 1);
+    if(bn.sub){
+      ctx.font = `800 15px ${FX}`; let sw = ctx.measureText(bn.sub).width + 22;
+      if(sw > maxW){ ctx.font = `800 12px ${FX}`; sw = ctx.measureText(bn.sub).width + 18; }
+      ctx.fillStyle = TINTA; rr(ctx, -sw / 2, bh / 2 + 4, sw, 26, 13); ctx.fill();
+      ctx.fillStyle = PAPEL; ctx.fillText(bn.sub, 0, bh / 2 + 17.5);
+    }
+    ctx.restore();
+  }
+}
+function desenhaRotuloSegura(j){
+  const bs = bolasDe(j); if(!bs.length) return;
+  const b = bs[0], dI = dInicio(j), vao = dI - R - BR;
+  const txt = b.estado === 'preso' ? (fase === 'conta' ? 'NÃO SOLTA!' : 'SEGURANDO') : 'SEGURA AQUI';
+  const pul = b.estado === 'preso' ? 1 : 1 + Math.sin(performance.now() / 180) * .05;
+  ctx.save(); const a = ancora(j); ctx.translate(a.x, a.y); ctx.rotate(ROT[j.lado]);
+  // entre a base e a bolinha, se couber; senão, depois da bolinha
+  const y = vao >= 30 ? -(BR + vao / 2) : -(dI + R + 22);
+  ctx.translate(0, y); ctx.scale(pul, pul);
+  let fs = clamp(vao * .52, 14, 19); ctx.font = `${fs}px ${FT}`; let w = ctx.measureText(txt).width;
+  if(w > bordaDe(j) * .62){ fs = Math.floor(fs * bordaDe(j) * .62 / w); ctx.font = `${fs}px ${FT}`; w = ctx.measureText(txt).width; }
+  ctx.fillStyle = b.estado === 'preso' ? j.cor.c : TINTA; rr(ctx, -w / 2 - 10, -fs * .72, w + 20, fs * 1.44, 8); ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = b.estado === 'preso' ? TINTA : j.cor.c; ctx.stroke();
+  ctx.fillStyle = b.estado === 'preso' ? TINTA : j.cor.c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 1);
+  ctx.restore();
+  if(solo && b.estado !== 'preso'){
+    ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(ROT[j.lado]);
+    ctx.font = `800 13px ${FX}`; ctx.fillStyle = 'rgba(247,241,230,.7)'; ctx.textAlign = 'center';
+    ctx.fillText(mouseSolo ? 'aperta e segura o botão do mouse' : 'segura 1 segundo pra começar', 0, -(dI + R + 26));
+    ctx.restore();
+  }
+}
+function desenhaPrevias(){
+  for(const b of B){
+    const m = b.mov; if(!m) continue;
+    const s = (tj - m.t0 - m.prev) / m.dur; if(s >= 1) continue;
+    const c = J[b.j].cor, al = s < 0 ? .9 : .9 * (1 - s);
+    ctx.save(); ctx.globalAlpha = al; ctx.lineCap = 'round';
+    ctx.setLineDash([2, 12]); ctx.lineDashOffset = -performance.now() / 25; ctx.lineWidth = 6; ctx.strokeStyle = c.c;
+    ctx.beginPath(); for(let k = 0; k <= 30; k++){ const p = m.pos(k / 30); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke();
+    ctx.setLineDash([]);
+    // o fantasma de onde ela vai parar
+    const pf = m.pos(1);
+    ctx.setLineDash([7, 6]); ctx.lineWidth = 3; ctx.strokeStyle = c.c; ctx.beginPath(); ctx.arc(pf.x, pf.y, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    ctx.globalAlpha = al * .5; ctx.fillStyle = c.c; forma(ctx, c.forma, pf.x, pf.y, R * .34, ROT[J[b.j].lado]);
+    // a setinha no meio do caminho
+    const p1 = m.pos(.48), p2 = m.pos(.52), an = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    ctx.globalAlpha = al; ctx.translate(p2.x, p2.y); ctx.rotate(an); ctx.fillStyle = c.c; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+function desenhaRastros(agora){
+  ctx.save(); ctx.lineCap = 'round';
+  for(const b of B){
+    const pts = b.rastro;
+    while(pts.length && agora - pts[0].t > 480) pts.shift();
+    if(pts.length < 2) continue;
+    const c = J[b.j].cor;
+    for(let i = 1; i < pts.length; i++){
+      const k = 1 - (agora - pts[i].t) / 480; if(k <= 0) continue;
+      ctx.strokeStyle = rgba(c, k * .5); ctx.lineWidth = R * 1.5 * k;
+      ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function tracaCorda(p){
+  ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+  for(let i = 1; i < p.length - 1; i++){ const mx = (p[i].x + p[i + 1].x) / 2, my = (p[i].y + p[i + 1].y) / 2; ctx.quadraticCurveTo(p[i].x, p[i].y, mx, my); }
+  ctx.lineTo(p[p.length - 1].x, p[p.length - 1].y);
+}
+function desenhaCorda(b){
+  const c = J[b.j].cor, p = b.corda.p;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  tracaCorda(p);
+  if(b.estado === 'espera'){
+    // ainda sem dedo: a corda é tracejada
+    ctx.setLineDash([10, 9]); ctx.lineDashOffset = -performance.now() / 30; ctx.lineWidth = 4; ctx.strokeStyle = rgba(c, .8); ctx.stroke();
+  } else {
+    ctx.lineWidth = 12; ctx.strokeStyle = TINTA; ctx.stroke();
+    ctx.lineWidth = 7.5; ctx.strokeStyle = b.estado === 'solto' && Math.floor(performance.now() / 90) % 2 ? PAPEL : c.c; ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.38)'; ctx.stroke();
+  }
+  ctx.restore();
+}
+function desenhaCordasSoltas(){
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for(const c of cordasSoltas){
+    const j = J[c.j]; if(!j) continue;
+    ctx.globalAlpha = clamp(1 - c.t / .5, 0, 1);
+    tracaCorda(c.p); ctx.lineWidth = 11; ctx.strokeStyle = TINTA; ctx.stroke(); ctx.lineWidth = 7; ctx.strokeStyle = j.cor.c; ctx.stroke();
+  }
+  ctx.restore();
+}
+function desenhaCruzes(agora){
+  if(!cruzes.length) return;
+  ctx.save(); ctx.fillStyle = PAPEL;
+  const s = 5 + Math.sin(agora / 160) * 1.5;
+  for(const p of cruzes){
+    ctx.globalAlpha = .85; ctx.beginPath();
+    ctx.moveTo(p.x, p.y - s * 1.6); ctx.lineTo(p.x + s * .35, p.y - s * .35); ctx.lineTo(p.x + s * 1.6, p.y); ctx.lineTo(p.x + s * .35, p.y + s * .35);
+    ctx.lineTo(p.x, p.y + s * 1.6); ctx.lineTo(p.x - s * .35, p.y + s * .35); ctx.lineTo(p.x - s * 1.6, p.y); ctx.lineTo(p.x - s * .35, p.y - s * .35); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+function desenhaBases(){
+  for(const j of J){
+    const a = ancora(j);
+    ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(ROT[j.lado]);
+    ctx.beginPath(); ctx.arc(0, 0, BR, Math.PI, TAU); ctx.closePath();
+    ctx.fillStyle = j.fora ? '#3A3443' : j.cor.c; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = TINTA; ctx.stroke();
+    ctx.fillStyle = TINTA; forma(ctx, j.cor.forma, 0, -BR * .44, BR * .3, 0);
+    if(j.fora){ ctx.strokeStyle = PAPEL; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-BR * .42, -BR * .82); ctx.lineTo(BR * .42, -BR * .06); ctx.moveTo(BR * .42, -BR * .82); ctx.lineTo(-BR * .42, -BR * .06); ctx.stroke(); }
+    // o nome ao lado da base, e um pontinho por dedo
+    ctx.font = `800 13px ${FX}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const nm = nomeDe(j).toUpperCase(); ctx.fillStyle = j.fora ? 'rgba(247,241,230,.35)' : PAPEL; ctx.fillText(nm, BR + 9, -10);
+    let px = BR + 9 + ctx.measureText(nm).width + 10;
+    for(const b of bolasDe(j)){ ctx.beginPath(); ctx.arc(px, -14.5, 4.2, 0, TAU); if(b.estado === 'preso'){ ctx.fillStyle = j.cor.c; ctx.fill(); } else { ctx.lineWidth = 1.6; ctx.strokeStyle = j.cor.c; ctx.stroke(); } px += 11; }
+    ctx.restore();
+  }
+}
+function desenhaBola(b, agora){
+  const j = J[b.j]; if(!j) return;
+  const c = j.cor, rot = ROT[j.lado], idade = (agora - b.nasce) / 1000;
+  let r = R * (idade < .42 ? Math.max(.02, sobra(clamp(idade / .42, 0, 1))) : 1);
+  const pg = (agora - b.pegou) / 1000; if(b.pegou && pg < .3) r *= 1 + Math.sin(pg / .3 * Math.PI) * .14;
+  let x = b.x, y = b.y;
+  const alerta = b.estado === 'solto' || b.foraT > 0;
+  if(alerta && !reduz){ x += (Math.random() - .5) * 8; y += (Math.random() - .5) * 8; }
+  const pb = batida();
+  const gl = r * (b.estado === 'espera' ? 3 + Math.sin(agora / 130) * .3 : 2.5 + pb * .35);
+  ctx.drawImage(glowDe(c), x - gl, y - gl, gl * 2, gl * 2);
+  if(b.estado === 'preso' && fase === 'jogo' && !reduz){ ctx.beginPath(); ctx.arc(x, y, r * (1.1 + (1 - pb) * .28), 0, TAU); ctx.strokeStyle = rgba(c, .55 * pb); ctx.lineWidth = 3; ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = c.c; ctx.fill();
+  const g = ctx.createRadialGradient(x - r * .38, y - r * .42, r * .05, x, y, r);
+  g.addColorStop(0, 'rgba(255,255,255,.6)'); g.addColorStop(.32, 'rgba(255,255,255,.1)'); g.addColorStop(1, 'rgba(0,0,0,.2)');
+  ctx.fillStyle = g; ctx.fill();
+  ctx.lineWidth = 3.5; ctx.strokeStyle = TINTA; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r * .76, 0, TAU); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(19,15,25,.3)'; ctx.stroke();
+  ctx.fillStyle = TINTA; forma(ctx, c.forma, x, y, r * .35, rot);
+  if(b.estado === 'espera'){
+    ctx.save(); ctx.setLineDash([8, 7]); ctx.lineDashOffset = -agora / 28; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(247,241,230,.85)';
+    ctx.beginPath(); ctx.arc(x, y, r + 9, 0, TAU); ctx.stroke(); ctx.restore();
+    if(isFinite(b.prazo) && b.prazoTot){
+      // o anel que esvazia: quando acaba, saiu
+      const k = clamp(b.prazo / b.prazoTot, 0, 1), pisca = b.prazo < 1 && Math.floor(agora / 110) % 2;
+      ctx.beginPath(); ctx.arc(x, y, r + 17, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.strokeStyle = TINTA; ctx.stroke(); ctx.lineWidth = 4.5; ctx.strokeStyle = pisca ? PAPEL : c.c; ctx.stroke();
+    }
+  } else if(b.estado === 'solto'){
+    const k = clamp(b.soltoT / FOLGA_SOLTO, 0, 1);
+    ctx.beginPath(); ctx.arc(x, y, r + 10, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.lineWidth = 6; ctx.strokeStyle = PAPEL; ctx.stroke();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.font = `15px ${FT}`; ctx.textAlign = 'center'; ctx.fillStyle = PAPEL; ctx.fillText('VOLTA!', 0, -r - 22); ctx.restore();
+  } else if(b.foraT > 0){
+    ctx.beginPath(); ctx.arc(x, y, r + 8, 0, TAU); ctx.lineWidth = 4; ctx.strokeStyle = Math.floor(agora / 80) % 2 ? PAPEL : c.c; ctx.stroke();
+  }
+  if(fase === 'segura' && b.estado === 'preso' && seguraT > 0){
+    ctx.beginPath(); ctx.arc(x, y, r + 11, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(seguraT, 0, 1)); ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.strokeStyle = PAPEL; ctx.stroke();
+  }
+}
+function desenhaToques(){
+  // dedo que não tá em bolinha nenhuma não conta: fica um aro apagado pra pessoa ver
+  ctx.save();
+  for(const t of T.values()){
+    if(t.bot || t.bola != null || !jogando()) continue;
+    ctx.beginPath(); ctx.arc(t.x, t.y, 24, 0, TAU); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(247,241,230,.28)'; ctx.setLineDash([4, 5]); ctx.stroke();
+  }
+  ctx.restore();
+}
+function desenhaDedos(){
+  for(const t of T.values()){
+    if(!t.bot) continue;
+    const j = J[t.jj]; if(!j) continue;
+    desenhaDedo(t.x, t.y, j, t.mao);
+  }
+}
+function desenhaDedo(x, y, j, mao){
+  // a mão vem do lado de quem joga: a ponta do indicador no toque, o polegar de um lado, os outros dedos dobrados do outro,
+  // e a manga na cor do jogador (dá pra ver de quem é cada braço no meio do nó)
+  const a = ancora(j), lado = { baixo: [0, 1], cima: [0, -1], esq: [-1, 0], dir: [1, 0] }[j.lado];
+  const bx = a.x + lado[0] * 80 + (x - a.x) * .12, by = a.y + lado[1] * 80 + (y - a.y) * .12;
+  const ang = Math.atan2(y - by, x - bx), w = R * .74, braco = Math.max(9.4 * w, Math.hypot(x - bx, y - by) + 90);
+  const pecas = [
+    ['manga', () => rr(ctx, -braco, -.5 * w, braco - 4.8 * w, 2.7 * w, .7 * w)],
+    ['punho', () => rr(ctx, -5.3 * w, -.5 * w, .4 * w, 2.7 * w, .15 * w)],
+    ['pele', () => rr(ctx, -5.45 * w, -.78 * w, 3.0 * w, 3.2 * w, .95 * w)],
+    ['pele', () => rr(ctx, -3.1 * w, .6 * w, .8 * w, .6 * w, .28 * w)],
+    ['pele', () => rr(ctx, -3.1 * w, 1.22 * w, .8 * w, .6 * w, .28 * w)],
+    ['pele', () => rr(ctx, -3.15 * w, 1.84 * w, .78 * w, .56 * w, .28 * w)],
+    ['pele', () => { ctx.save(); ctx.translate(-3.75 * w, -.86 * w); ctx.rotate(-.42); rr(ctx, -1.05 * w, -.31 * w, 2.0 * w, .62 * w, .31 * w); ctx.restore(); }],
+    ['pele', () => rr(ctx, -2.95 * w, -.5 * w, 3.42 * w, w, .5 * w)]
+  ];
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(1, mao || 1);
+  ctx.save(); ctx.translate(6, 11); ctx.fillStyle = 'rgba(0,0,0,.3)'; for(const [, f] of pecas){ f(); ctx.fill(); } ctx.restore();
+  ctx.strokeStyle = TINTA; ctx.lineWidth = 2.6; ctx.lineJoin = 'round';
+  for(const [tipo, f] of pecas){ ctx.fillStyle = tipo === 'pele' ? j.cor.pele : tipo === 'manga' ? j.cor.c : TINTA; f(); ctx.fill(); ctx.stroke(); }
+  // a unha e a dobra do dedo
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(.06 * w, 0, .3 * w, .27 * w, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(19,15,25,.38)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-1.5 * w, -.28 * w); ctx.lineTo(-1.5 * w, .28 * w); ctx.moveTo(-1.64 * w, -.24 * w); ctx.lineTo(-1.64 * w, .24 * w); ctx.stroke();
+  ctx.restore();
+}
+function desenhaParticulas(){
+  for(const p of parts){
+    const k = clamp(p.vida / p.max, 0, 1);
+    ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.6);
+    if(p.tipo === 'anel'){ ctx.beginPath(); ctx.arc(p.x, p.y, p.tam * (1 + (1 - k) * 1.8), 0, TAU); ctx.lineWidth = 6 * k + 1; ctx.strokeStyle = p.cor; ctx.stroke(); }
+    else if(p.tipo === 'bolha'){ ctx.globalAlpha = k * .7; ctx.beginPath(); ctx.arc(p.x, p.y, p.tam * (1 + (1 - k) * .7), 0, TAU); ctx.fillStyle = p.cor; ctx.fill(); ctx.globalAlpha = k; ctx.fillStyle = TINTA; forma(ctx, p.forma, p.x, p.y, R * .35 * (1 + (1 - k) * .7), p.rot); }
+    else if(p.tipo === 'forma'){ ctx.fillStyle = p.cor; forma(ctx, p.forma, p.x, p.y, p.tam * .6, p.rot); ctx.strokeStyle = TINTA; }
+    else if(p.tipo === 'confete'){ ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.rot * 1.7)); ctx.fillStyle = p.cor; ctx.fillRect(-p.tam / 2, -p.tam * .3, p.tam, p.tam * .6); }
+    else { ctx.fillStyle = p.cor; ctx.beginPath(); ctx.arc(p.x, p.y, p.tam * (p.tipo === 'faisca' ? k : 1), 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+}
+function desenhaContagem(agora){
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if(fase === 'segura' && J.length > 1){
+    // quem já tá segurando: um pontinho por pessoa no meio
+    const gap = 26, x0 = W / 2 - (J.length - 1) * gap / 2;
+    J.forEach((j, i) => { const ok = bolasDe(j).length && bolasDe(j).every(b => b.estado === 'preso'); ctx.beginPath(); ctx.arc(x0 + i * gap, H / 2, 8, 0, TAU); ctx.lineWidth = 3; ctx.strokeStyle = j.cor.c; ctx.stroke(); if(ok){ ctx.fillStyle = j.cor.c; ctx.fill(); } });
+  } else if(fase === 'conta'){
+    const n = 3 - Math.floor(contaT), f = contaT % 1, s = Math.min(W, H) * .3 * (reduz ? 1 : 1.25 - f * .25);
+    ctx.globalAlpha = 1 - f * .55; ctx.font = `${Math.round(s)}px ${FT}`;
+    ctx.lineWidth = 10; ctx.strokeStyle = TINTA; ctx.strokeText(n, 0 + W / 2, H / 2); ctx.fillStyle = CORES[(3 - n) % 4].c; ctx.fillText(n, W / 2, H / 2);
+  } else if(fase === 'jogo' && noT && agora - noT < 950){
+    const k = (agora - noT) / 950, s = Math.min(W, H) * .3 * (reduz ? 1 : .7 + k * .6);
+    ctx.globalAlpha = 1 - k; ctx.font = `${Math.round(s)}px ${FT}`; ctx.lineWidth = 12; ctx.strokeStyle = TINTA; ctx.strokeText('NÓ!', W / 2, H / 2); ctx.fillStyle = PAPEL; ctx.fillText('NÓ!', W / 2, H / 2);
+  }
+  ctx.restore();
+}
+
+/* ---------- o som (tudo sintetizado na hora) ---------- */
+let ac = null, mestre = null, busMus = null, busSfx = null, ruido = null;
+const VOL_MUS = .4;
+let somOn = le('som') !== '0', vozOn = le('voz') !== '0';
+const mus = { on: false, prox: 0, passo: 0 };
+let pulsos = [];
+function audio(){
+  if(ac){ if(ac.state === 'suspended') try{ ac.resume(); }catch(e){} return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+  try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+  try{ ac = new AC(); }catch(e){ ac = null; return; }
+  mestre = ac.createGain(); mestre.gain.value = somOn ? .9 : 0;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -12; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .2;
+  mestre.connect(comp); comp.connect(ac.destination);
+  busMus = ac.createGain(); busMus.gain.value = VOL_MUS; busMus.connect(mestre);
+  busSfx = ac.createGain(); busSfx.gain.value = 1; busSfx.connect(mestre);
+  const n = ac.sampleRate; ruido = ac.createBuffer(1, n, n); const d = ruido.getChannelData(0); for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+}
+const gan = (o = busSfx) => { const g = ac.createGain(); g.connect(o); return g; };
+const env = (g, t, a, v, d) => { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(.0002, v), t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); };
+const osc = (tipo, f, t, dur, o) => { const s = ac.createOscillator(); s.type = tipo; s.frequency.setValueAtTime(f, t); s.connect(o); s.start(t); s.stop(t + dur + .05); return s; };
+const ruid = (t, dur, o) => { const s = ac.createBufferSource(); s.buffer = ruido; s.connect(o); s.start(t, Math.random() * .5); s.stop(t + dur + .05); return s; };
+const filt = (tipo, f, q, o) => { const b = ac.createBiquadFilter(); b.type = tipo; b.frequency.value = f; b.Q.value = q; b.connect(o); return b; };
+function bumbo(t, v, o = busMus){ const g = gan(o); env(g, t, .002, .95 * v, .3); const s = osc('sine', 155, t, .34, g); s.frequency.exponentialRampToValueAtTime(44, t + .14); const g2 = gan(o); env(g2, t, .001, .22 * v, .02); ruid(t, .02, filt('highpass', 3000, .7, g2)); }
+function palma(t, v, o = busMus){ const f = filt('bandpass', 1500, .9, o); for(let i = 0; i < 3; i++){ const g = gan(f); env(g, t + i * .011, .001, .5 * v, i < 2 ? .012 : .13); ruid(t + i * .011, i < 2 ? .02 : .16, g); } }
+function chimbal(t, v, o = busMus){ const g = gan(o); env(g, t, .001, .15 * v, .035); ruid(t, .05, filt('highpass', 7800, .6, g)); }
+function baixo(t, f, d, v, o = busMus){ const g = gan(o); env(g, t, .006, .34 * v, d); const lp = filt('lowpass', 420, 6, g); lp.frequency.setValueAtTime(1100, t); lp.frequency.exponentialRampToValueAtTime(240, t + d); osc('sawtooth', f, t, d + .05, lp); const g2 = gan(o); env(g2, t, .006, .3 * v, d); osc('sine', f, t, d + .05, g2); }
+function acorde(t, fs, v, o = busMus){ const g = gan(o); env(g, t, .004, .06 * v, .2); const lp = filt('lowpass', 2000, 1, g); fs.forEach(f => { osc('square', f, t, .26, lp); osc('sawtooth', f * 1.006, t, .26, lp); }); }
+// a batida: mi menor, começa em 100 e chega a 146 por minuto conforme o nó aperta
+const E2 = 82.41, G2 = 98, A2 = 110, B2 = 123.47, D2 = 73.42, E3 = 164.81, D3 = 146.83;
+const BAIXO = [E2, 0, E2, E3, 0, 0, G2, 0, E2, 0, A2, G2, 0, 0, D2, 0, E2, 0, E2, E3, 0, 0, B2, 0, A2, 0, G2, 0, E2, 0, D3, 0];
+const ACORDES = [[329.63, 392, 493.88], [261.63, 329.63, 392], [293.66, 369.99, 440], [246.94, 293.66, 369.99]];
+const intensidade = () => clamp(tj / 90, 0, 1);
+const bpmAgora = () => 100 + 46 * intensidade();
+function musicaLiga(){ if(!ac || demo) return; mus.on = true; mus.prox = ac.currentTime + .06; mus.passo = 0; pulsos = []; }
+function musicaDesliga(){ mus.on = false; }
+function agendaMusica(){
+  if(!ac || !mus.on) return;
+  if(mus.prox < ac.currentTime - .25) mus.prox = ac.currentTime + .03;
+  const ate = ac.currentTime + .15;
+  while(mus.prox < ate){
+    const t = mus.prox, k = mus.passo % 16, bar = Math.floor(mus.passo / 16) % 4, I = intensidade();
+    if(k % 4 === 0){ pulsos.push(t); if(pulsos.length > 8) pulsos.shift(); }
+    if(somOn){
+      if(k === 0 || k === 8 || (I > .25 && (k === 4 || k === 12)) || (I > .65 && k === 14)) bumbo(t, k === 0 ? 1 : .8);
+      if(k === 4 || k === 12) palma(t, .5 + I * .35);
+      if(k % 2 === 0 || I > .5) chimbal(t, k % 4 === 2 ? 1 : k % 2 ? .5 : .7);
+      const f = BAIXO[mus.passo % 32]; if(f) baixo(t, f, 60 / bpmAgora() / 4 * 1.7, .9);
+      if(I > .4 && (k === 0 || k === 6 || k === 10)) acorde(t, ACORDES[bar], k === 0 ? 1 : .7);
+    }
+    mus.prox += 60 / bpmAgora() / 4; mus.passo++;
+  }
+}
+const SFX = {
+  tic(n){ const t = ac.currentTime, f = [0, 784, 659.25, 523.25][+n || 0] || 523; const g = gan(); env(g, t, .003, .32, .14); osc('square', f, t, .17, filt('lowpass', 2600, 1, g)); bumbo(t, .5, busSfx); },
+  no(){ const t = ac.currentTime; bumbo(t, 1.2, busSfx); const g = gan(); env(g, t, .002, .35, 1.1); ruid(t, 1.2, filt('highpass', 4200, .5, g)); const g2 = gan(); env(g2, t, .01, .16, .8); [329.63, 415.3, 493.88, 659.25].forEach(f => osc('sawtooth', f, t, .9, filt('lowpass', 2400, 1, g2))); },
+  novo(j){ const t = ac.currentTime, f = j ? j.cor.nota : 523; [0, .07, .14].forEach((d, i) => { const g = gan(); env(g, t + d, .003, .2, .22); osc('triangle', f * [1, 1.5, 2][i], t + d, .26, g); }); },
+  pega(j){ const t = ac.currentTime, f = j ? j.cor.nota : 523; const g = gan(); env(g, t, .002, .34, .14); const s = osc('sine', f * .5, t, .18, g); s.frequency.exponentialRampToValueAtTime(f * 1.5, t + .08); const g2 = gan(); env(g2, t, .001, .18, .02); ruid(t, .02, filt('bandpass', 3000, 2, g2)); },
+  prepara(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .16, .12); const s = osc('triangle', 880, t, .14, g); s.frequency.exponentialRampToValueAtTime(1320, t + .1); },
+  anda(){ const t = ac.currentTime; const g = gan(); env(g, t, .12, .22, .5); const f = filt('bandpass', 400, 2.5, g); f.frequency.exponentialRampToValueAtTime(2600, t + .55); ruid(t, .65, f); },
+  troca(){ const t = ac.currentTime; for(const [a, b] of [[300, 2400], [2400, 300]]){ const g = gan(); env(g, t, .1, .17, .55); const f = filt('bandpass', a, 3, g); f.frequency.exponentialRampToValueAtTime(b, t + .6); ruid(t, .7, f); } const g = gan(); env(g, t + .1, .02, .06, .45); const s = osc('sawtooth', 200, t + .1, .5, filt('lowpass', 1800, 2, g)); s.frequency.exponentialRampToValueAtTime(900, t + .55); },
+  solta(j){ const t = ac.currentTime; const g = gan(); env(g, t, .2, .22, .8); const f = filt('lowpass', 1800, .7, g); f.frequency.exponentialRampToValueAtTime(260, t + .95); ruid(t, 1.05, f); const base = (j ? j.cor.nota : 523) / 2; const g2 = gan(); env(g2, t + .05, .12, .08, .85); [1, 1.25, 1.5].forEach(m => osc('sine', base * m, t + .05, 1.05, g2)); },
+  alerta(){ const t = ac.currentTime; for(let i = 0; i < 2; i++){ const g = gan(); env(g, t + i * .09, .002, .17, .05); osc('square', 1320, t + i * .09, .07, filt('lowpass', 3000, 1, g)); } },
+  volta(){ const t = ac.currentTime; const g = gan(); env(g, t, .002, .2, .1); const s = osc('triangle', 600, t, .14, g); s.frequency.exponentialRampToValueAtTime(1200, t + .1); },
+  tique(n){ const t = ac.currentTime; const g = gan(); env(g, t, .001, .1, .03); osc('sine', 1400 + clamp(+n || 0, 0, 4) * 180, t, .05, g); },
+  estouro(){ const t = ac.currentTime; const g = gan(); env(g, t, .001, .6, .3); const f = filt('lowpass', 2400, .8, g); f.frequency.exponentialRampToValueAtTime(200, t + .35); ruid(t, .4, f); const g2 = gan(); env(g2, t, .002, .7, .35); const s = osc('sine', 130, t, .4, g2); s.frequency.exponentialRampToValueAtTime(38, t + .3); const g3 = gan(); env(g3, t + .08, .02, .12, .55); const w = osc('sawtooth', 420, t + .08, .6, filt('lowpass', 1400, 4, g3)); w.frequency.exponentialRampToValueAtTime(70, t + .6); },
+  vence(){ const t = ac.currentTime; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => { const g = gan(); env(g, t + i * .1, .005, .2, .3); osc('square', f, t + i * .1, .35, filt('lowpass', 3000, 1, g)); }); const g = gan(); env(g, t + .42, .01, .14, 1.4); [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(f => { osc('sawtooth', f, t + .42, 1.5, filt('lowpass', 2600, 1, g)); osc('square', f / 2, t + .42, 1.5, filt('lowpass', 1200, 1, g)); }); for(let i = 0; i < 8; i++) bumbo(t + .42 + i * .11, i ? .4 : 1, busSfx); const g4 = gan(); env(g4, t + .42, .002, .26, 1.3); ruid(t + .42, 1.4, filt('highpass', 5000, .5, g4)); },
+  fimSolo(){ const t = ac.currentTime; [659.25, 587.33, 493.88, 392].forEach((f, i) => { const g = gan(); env(g, t + .25 + i * .13, .005, .15, .3); osc('square', f, t + .25 + i * .13, .35, filt('lowpass', 2000, 1, g)); }); },
+  cruzou(){ const t = ac.currentTime; const g = gan(); env(g, t, .001, .07, .09); osc('sine', 2300 + Math.random() * 700, t, .11, g); },
+  cancela(){ const t = ac.currentTime; const g = gan(); env(g, t, .004, .25, .2); const s = osc('triangle', 300, t, .25, g); s.frequency.exponentialRampToValueAtTime(150, t + .2); }
+};
+// cada efeito com o seu volume (o ANDA e o tique são baixinhos de nascença), e a batida abaixa um instante pro aviso passar
+const GANHO = { anda: 3, prepara: 2.8, troca: 2.4, pega: 2, volta: 2.6, tique: 2.6, cruzou: 2.6, novo: 1.7, alerta: 1.6, cancela: 2, tic: 1.2, solta: 1.2 };
+const ABAIXA = new Set(['novo', 'prepara', 'solta', 'estouro', 'no', 'vence', 'alerta']);
+function som(k, x){
+  if(!k || !ac || !somOn || demo) return;
+  const bus = busSfx;
+  try{ const g = ac.createGain(); g.gain.value = GANHO[k] || 1; g.connect(bus); busSfx = g; SFX[k](x); }catch(e){} finally{ busSfx = bus; }
+  if(ABAIXA.has(k) && busMus) try{ const t = ac.currentTime, gm = busMus.gain; gm.cancelScheduledValues(t); gm.setValueAtTime(gm.value, t); gm.setTargetAtTime(VOL_MUS * .4, t, .02); gm.setTargetAtTime(VOL_MUS, t + .32, .16); }catch(e){}
+}
+
+/* ---------- a voz: anuncia em pt-BR, se o aparelho tiver uma ---------- */
+const SS = window.speechSynthesis || null;
+let vozPT = null, falaAlta = 0;
+function achaVoz(){ try{ const vs = SS.getVoices() || []; vozPT = vs.find(v => /^pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }catch(e){ vozPT = null; } atualizaBotoesSom(); }
+if(SS){ achaVoz(); try{ SS.addEventListener('voiceschanged', achaVoz); }catch(e){ try{ SS.onvoiceschanged = achaVoz; }catch(er){} } }
+function fala(txt, alta){
+  if(!SS || !vozOn || !vozPT || demo || !txt) return;
+  try{
+    // aviso de quem saiu não é cortado pelo próximo evento
+    const u = new SpeechSynthesisUtterance(txt); u.voice = vozPT; u.lang = vozPT.lang; u.rate = 1.12; u.pitch = 1.05; u.volume = 1;
+    const corta = (alta || performance.now() > falaAlta) && (SS.speaking || SS.pending);
+    if(corta){ SS.cancel(); setTimeout(() => { try{ SS.speak(u); }catch(e){} }, 45); } else SS.speak(u);
+    if(alta) falaAlta = performance.now() + 1400;
+  }catch(e){}
+}
+let falaDestravada = false;
+function destravaFala(){ if(!SS || falaDestravada) return; falaDestravada = true; try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; SS.speak(u); }catch(e){} }
+
+/* ---------- a tela não apaga no meio do nó ---------- */
+let trava = null;
+async function pedeTrava(){ if(demo || trava || !('wakeLock' in navigator) || document.hidden) return; try{ trava = await navigator.wakeLock.request('screen'); trava.addEventListener('release', () => { trava = null; }); }catch(e){ trava = null; } }
+function soltaTrava(){ try{ if(trava) trava.release(); }catch(e){} trava = null; }
+
+function primeiroGesto(fala){ audio(); if(fala) destravaFala(); }
+
+/* ---------- o link ---------- */
+function soltoNaJanela(){ try{ return window.self === window.top; }catch(e){ return false; } }
+function linkBase(){ return soltoNaJanela() ? location.href.split('#')[0] : LINK_DO_ARTEFATO; }
+function passaLink(url, botao, campo, texto){
+  if(!url) return;
+  const rot = botao.dataset.rot || botao.textContent; botao.dataset.rot = rot;
+  if(soltoNaJanela() && navigator.share){ navigator.share({ title: 'Nó', text: texto, url }).catch(() => {}); return; }
+  const mostra = () => { const c = $(campo); c.hidden = false; const inp = c.querySelector('input'); inp.value = url; inp.focus(); inp.select(); };
+  try{
+    navigator.clipboard.writeText(url).then(() => { botao.textContent = 'Link copiado'; setTimeout(() => { botao.textContent = rot; }, 1800); }, mostra);
+  }catch(e){ mostra(); }
+}
+
+/* ---------- a capa e os botões ---------- */
+function montaTurma(){
+  const ul = $('turma'); ul.innerHTML = '';
+  for(let i = 0; i < nQtd; i++){
+    const c = CORES[i], li = document.createElement('li');
+    li.style.setProperty('--c', c.c);
+    li.innerHTML = `<span class="ficha" aria-hidden="true">${svgForma(c.forma)}</span><input maxlength="12" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="${c.nome}" aria-label="Nome de quem fica com a cor ${c.nome} (opcional)" value="${esc(nomes[i] || '')}"><small>${nQtd === 1 ? 'solo' : LADO_TXT[c.lado]}</small>`;
+    const inp = li.querySelector('input');
+    inp.addEventListener('input', () => { nomes[i] = inp.value.trim().slice(0, 12); guarda('nomes', JSON.stringify(nomes)); });
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') inp.blur(); });
+    ul.appendChild(li);
+  }
+  document.querySelectorAll('#seg button').forEach(b => { const n = +b.dataset.n; b.setAttribute('aria-pressed', String(n === nQtd)); b.disabled = n > LIMITE; });
+  // o aviso discreto de quantos dedos a tela aguenta
+  const a = $('aviso'); let t = '';
+  if(LIMITE <= 1) t = 'Essa tela só lê <b>um dedo</b> por vez: aqui dá pra jogar o Solo, seguindo a bolinha.';
+  else if(nQtd > 1 && LIMITE / nQtd < 2) t = `Essa tela segura até <b>${LIMITE} dedos</b> ao mesmo tempo. Com ${nQtd} fica apertado: cada um fica com 1 ou 2.`;
+  else if(LIMITE < 4) t = `Essa tela segura só <b>${LIMITE} dedos</b> ao mesmo tempo, então dá pra jogar em até ${LIMITE}.`;
+  a.innerHTML = t; a.hidden = !t || MODO_PC;
+  const rec = +(le('rec-solo') || 0), recM = +(le('rec-mouse') || 0), cr = $('capaRec');
+  if(MODO_PC){ cr.hidden = !recM; cr.textContent = 'Teu recorde no mouse: ' + mmss(recM); }
+  else { cr.hidden = !(nQtd === 1 && rec); cr.textContent = 'Teu recorde no Solo: ' + mmss(rec); }
+  confereRola();
+}
+function confereRola(){ const c = $('capa'); c.classList.remove('rola'); if(!c.hidden && c.scrollHeight > c.clientHeight + 2) c.classList.add('rola'); }
+function mostraCapa(){
+  $('fim').hidden = true; $('capa').hidden = false; $('bVolta').hidden = true; $('bSomCanto').hidden = true; $('linkCampo').hidden = true;
+  musicaDesliga(); soltaTrava(); mouseApertado = false; cv.classList.remove('aperta');
+  if(SS) try{ SS.cancel(); }catch(e){}
+  montaTurma(); iniciaDemo();
+}
+document.querySelector('.regras').addEventListener('toggle', confereRola);
+function atualizaBotoesSom(){
+  for(const id of ['bSom', 'bSomCanto']) $(id).setAttribute('aria-pressed', String(somOn));
+  const bv = $('bVoz'); bv.setAttribute('aria-pressed', String(vozOn)); bv.hidden = !SS || !vozPT;
+}
+function trocaSom(){ somOn = !somOn; guarda('som', somOn ? '1' : '0'); audio(); if(mestre) mestre.gain.setTargetAtTime(somOn ? .9 : 0, ac.currentTime, .05); atualizaBotoesSom(); }
+$('bSom').addEventListener('click', trocaSom);
+$('bSomCanto').addEventListener('click', trocaSom);
+$('bVoz').addEventListener('click', () => { vozOn = !vozOn; guarda('voz', vozOn ? '1' : '0'); destravaFala(); atualizaBotoesSom(); if(vozOn) fala('Voz ligada.'); });
+$('seg').addEventListener('click', e => { const b = e.target.closest('button'); if(!b || b.disabled) return; nQtd = +b.dataset.n; guarda('qtd', String(nQtd)); montaTurma(); });
+$('bVai').addEventListener('click', () => { primeiroGesto(true); pedeTrava(); iniciaPartida(Math.min(nQtd, LIMITE)); });
+$('bMouse').addEventListener('click', () => { primeiroGesto(true); iniciaPartida(1, { mouse: true }); });
+$('bVolta').addEventListener('click', mostraCapa);
+$('bDeNovo').addEventListener('click', () => { primeiroGesto(true); pedeTrava(); iniciaPartida(J.length || nQtd, { mouse: mouseSolo }); });
+$('bTurma').addEventListener('click', mostraCapa);
+$('bLink').addEventListener('click', () => passaLink(linkBase(), $('bLink'), 'linkCampo', 'Bora dar um nó? Twister de dedo pra jogar com o celular deitado na mesa.'));
+$('bLink2').addEventListener('click', () => { $('linkDica2').textContent = 'Copia esse link e manda pra galera.'; passaLink(linkBase(), $('bLink2'), 'linkCampo2', 'Bora dar um nó? Twister de dedo pra jogar com o celular deitado na mesa.'); });
+$('bDesafio').addEventListener('click', () => { const s = Math.floor(tj); $('linkDica2').textContent = 'Quem abrir esse link vê o teu tempo pra bater.'; passaLink(linkBase() + '#solo-' + s, $('bDesafio'), 'linkCampo2', 'Aguentei ' + mmss(s) + ' no Nó sem soltar o dedo. Bate?'); });
+addEventListener('keydown', e => {
+  if(e.key === 'Escape' && (fase === 'segura' || (fase === 'jogo' && mouseSolo && !mouseApertado)) && !demo) mostraCapa();
+});
+
+/* ---------- a página sumiu e voltou ---------- */
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    if(ac) try{ ac.suspend(); }catch(e){}
+    if(!demo && (fase === 'jogo' || fase === 'conta')) pausado = true;
+  } else {
+    if(ac) try{ ac.resume(); }catch(e){}
+    if(pausado){ pausado = false; if(fase === 'jogo' || fase === 'conta') retoma(true); }
+    if(!demo && jogando()) pedeTrava();
+  }
+});
+addEventListener('resize', () => { mede(); confereRola(); });
+
+/* ---------- o quadro ---------- */
+let ultimo = performance.now();
+function quadro(agora){
+  requestAnimationFrame(quadro);
+  const dtr = Math.min(.05, Math.max(0, (agora - ultimo) / 1000)); ultimo = agora;
+  // com a página escondida o relógio do jogo para (o navegador ainda pode rodar um quadro ou dois depois de sumir)
+  const dt = pausado || document.hidden ? 0 : dtr * VEL;
+  if(demo) passoBots(dt);
+  if(dt > 0){
+    if(fase === 'segura' || fase === 'conta') passoSegura(dt);
+    else if(fase === 'jogo') passoJogo(dt);
+    else if(fase === 'fim') passoFim(dt);
+  }
+  for(const b of B) passoCorda(b, dtr);
+  passoCordasSoltas(dtr); passoParticulas(dtr);
+  if(fase === 'jogo' || fase === 'segura' || fase === 'conta') contaNos();
+  agendaMusica();
+  tremor = Math.max(0, tremor - dtr * 2.6); flash = Math.max(0, flash - dtr * 3);
+  desenha(agora);
+}
+
+/* ---------- começa ---------- */
+(function inicio(){
+  nQtd = clamp(+(le('qtd') || 2) || 2, 1, 4);
+  try{ const a = JSON.parse(le('nomes') || '[]'); if(Array.isArray(a)) nomes = a.slice(0, 4).map(s => String(s || '').slice(0, 12)); }catch(e){}
+  const h = (location.hash || '').slice(1);
+  let m = /^solo-(\d{1,4})$/.exec(h); if(m){ desafio = +m[1]; nQtd = 1; }
+  m = /^([1-4])$/.exec(h); if(m) nQtd = +m[1];
+  nQtd = Math.min(nQtd, LIMITE);
+  if(desafio){ const d = $('desafio'); d.hidden = false; d.textContent = MODO_PC ? 'Te desafiaram: aguentar ' + mmss(desafio) + ' no Solo. Abre esse link no celular.' : 'Te desafiaram: aguentar ' + mmss(desafio) + ' no Solo sem soltar o dedo. Bate?'; }
+  if(MODO_PC){
+    // no computador: explica numa frase, mostra a mesa jogando sozinha e deixa testar no mouse
+    $('capa').classList.add('pc');
+    $('capaTxt').innerHTML = 'O Nó se joga <b>no celular, deitado na mesa, com a galera em volta</b>: cada um segura as bolinhas da sua cor e quem tirar o dedo sai. Aqui no computador dá pra testar o Solo, com o mouse fazendo de dedo.';
+    $('blocoToque').hidden = true; $('turma').hidden = true; $('bVai').hidden = true; $('blocoPC').hidden = false;
+    $('bLink').textContent = 'Passar o link pro celular';
+  }
+  $('bLink').hidden = !linkBase();
+  atualizaBotoesSom();
+  const lg = $('logo'), lx = lg.getContext('2d'); lx.clearRect(0, 0, 184, 184); desenhaNo(lx, 92, 92, 25, 11);
+  try{ document.fonts.load('46px "Dela Gothic One"').catch(() => {}); document.fonts.ready.then(confereRola); }catch(e){}
+  mede(); montaTurma(); iniciaDemo();
+  requestAnimationFrame(quadro);
+})();
+
+/* ---------- pros testes ---------- */
+window.__no = {
+  estado(){
+    const r = mesaEl.getBoundingClientRect();
+    return {
+      fase, demo, solo, mouseSolo, limite: LIMITE, vel: VEL, tempo: +tj.toFixed(3), W, H, R, origem: { x: r.left + vista.x, y: r.top + vista.y, e: vista.e },
+      jogadores: J.map(j => ({ i: j.i, cor: j.cor.k, nome: nomeDe(j), forma: j.cor.forma, lado: j.lado, fora: j.fora, foraEm: j.foraEm, motivo: j.motivo, bolinhas: bolasDe(j).length, banner: j.banner ? j.banner.txt : null })),
+      bolinhas: B.map(b => ({ id: b.id, dono: b.j, cor: J[b.j].cor.k, x: +b.x.toFixed(1), y: +b.y.toFixed(1), estado: b.estado, toque: b.toque, movendo: !!b.mov, prazo: isFinite(b.prazo) ? +b.prazo.toFixed(2) : null })),
+      toques: [...T.values()].filter(t => !t.bot).map(t => ({ id: t.id, x: +t.x.toFixed(1), y: +t.y.toFixed(1), bola: t.bola })),
+      eventos: eventos.slice(-40), sairam: ordemSaida.map(j => ({ i: j.i, cor: j.cor.k, em: +j.foraEm.toFixed(2), motivo: j.motivo })),
+      vencedor: vencedor ? vencedor.i : null, empate: !!empatados, maxDedos, maxNos, nos: nosAgora, proxEvento: +(proxEv - tj).toFixed(2), fimNaTela: !$('fim').hidden
+    };
+  },
+  comeca(n, op){ op = op || {}; if(op.nomes) nomes = op.nomes.slice(0, 4); audio(); iniciaPartida(clamp(n | 0, 1, 4), { mouse: !!op.mouse }); return this.estado(); },
+  forcaEvento(tipo, jogador){
+    const j = Array.isArray(jogador) ? null : typeof jogador === 'number' ? J[jogador] : null;
+    if(tipo === 'novo') return fazNovo(Array.isArray(jogador) ? jogador.map(i => J[i]) : [j || sorteia(vivos())]);
+    if(tipo === 'anda') return fazAnda(j || sorteia(vivos()));
+    if(tipo === 'solta') return fazSolta(j || sorteia(vivos()));
+    if(tipo === 'troca') return fazTroca(Array.isArray(jogador) ? jogador.map(i => J[i]) : j ? [j] : null);
+    return false;
+  },
+  velocidade(x){ VEL = clamp(+x || 1, .1, 20); return VEL; },
+  limite(n){ LIMITE = clamp(n | 0, 1, 10); nQtd = Math.min(nQtd, LIMITE) || 1; montaTurma(); return LIMITE; },
+  automatico(on){ auto = !!on; return auto; },
+  capa: mostraCapa
+};
+</script>
