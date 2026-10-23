@@ -61,6 +61,9 @@ coisa quica, o atrito da laranja e quanto ela segura pra rolar.
 
 - **Sem tela** (confere cada fase com uma gambiarra que funciona, 3 vezes cada):
   `godot --headless --path . --fixed-fps 60 -s res://tests/teste_fases.gd`
+- **O som** (cada instrumento contra o volume da versão web, e as batidas na grade de 124 BPM):
+  `godot --headless --path . -s res://tests/teste_som.gd -- --som` (sem o `-- --som` no fim ele não
+  acha o som e fica parado).
 - **Versão web num navegador de verdade** (precisa do Node e do Playwright): sirva a pasta
   `build/web` (por exemplo `python3 -m http.server 8060 --directory build/web`) e rode
   `node tests/web_teste.cjs` (ele abre a página com `?teste=1` no endereço, que liga uma ponte só
